@@ -1,6 +1,6 @@
 'use client'
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { getSkin, setSkin as persistSkin, SKINS } from '@/lib/store'
+import { getFontSize, getSkin, setSkin as persistSkin, SKINS } from '@/lib/store'
 
 const SkinContext = createContext({ skin: 0, setSkin: () => { }, skins: SKINS })
 
@@ -34,6 +34,12 @@ export default function SkinProvider({ children }) {
 
     useEffect(() => {
         updateSkin(getSkin())
+        const applyFontSize = () => {
+            document.documentElement.setAttribute('data-syj-font-size', getFontSize())
+        }
+        applyFontSize()
+        window.addEventListener('syj:font-size-changed', applyFontSize)
+        return () => window.removeEventListener('syj:font-size-changed', applyFontSize)
     }, [])
 
     const value = useMemo(() => ({

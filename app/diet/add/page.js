@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { addDietRecord, todayStr, trackEvent } from '@/lib/store'
+import { addDietRecord, getFrequentFoods, getPreferredMeal, setPreferredMeal, todayStr, trackEvent } from '@/lib/store'
 
 const MEALS = [
     { id: 'breakfast', label: '早餐', emoji: '🌅' },
@@ -46,24 +46,29 @@ export default function AddDietPage() {
     const [mode, setMode] = useState('manual')
     const [ai, setAi] = useState({ file: null, preview: '', loading: false })
     const [mealOpen, setMealOpen] = useState(false)
+    const [frequentFoods, setFrequentFoods] = useState([])
+    const [saving, setSaving] = useState(false)
 
     useEffect(() => {
         setForm((current) => ({
             ...current,
-            meal: searchParams.get('meal') || current.meal,
+            meal: searchParams.get('meal') || getPreferredMeal() || current.meal,
             name: searchParams.get('name') || current.name,
             calories: searchParams.get('calories') || current.calories,
             date: searchParams.get('date') || current.date,
             note: searchParams.get('note') || current.note,
         }))
+        setFrequentFoods(getFrequentFoods(3, 7))
     }, [searchParams])
 
     const handleSave = () => {
+        if (saving) return
         if (!form.name.trim()) return toast.error('请先选择或填写食物名称')
         const calories = Number(form.calories)
         if (!calories || calories <= 0) return toast.error('请填写正确的热量')
         if (calories > 5000) return toast.error('单次热量不能超过 5000 kcal')
 
+        setSaving(true)
         addDietRecord({
             meal: form.meal,
             name: form.name.trim(),
@@ -72,8 +77,23 @@ export default function AddDietPage() {
             note: form.note.trim(),
         })
         trackEvent('diet_add_save', { mode: form.note.includes('AI识别') ? 'ai' : 'manual', meal: form.meal, calories })
-        toast.success('已添加饮食记录 🍱')
-        router.replace('/diet')
+        toast.success('饮食添加成功 √')
+        window.setTimeout(() => router.replace('/diet'), 250)
+    }
+
+    const handleInstantAdd = (food) => {
+        if (saving) return
+        setSaving(true)
+        addDietRecord({
+            meal: form.meal,
+            name: food.name,
+            calories: Number(food.calories) || 0,
+            date: form.date,
+            note: '常用食物一键添加',
+        })
+        trackEvent('diet_quick_food_add', { name: food.name, meal: form.meal })
+        toast.success(`已添加 ${food.name} √`)
+        window.setTimeout(() => router.replace('/diet'), 650)
     }
 
     const handleAiFile = (file) => {
@@ -166,6 +186,27 @@ export default function AddDietPage() {
                         placeholder="请输入食物名称或点击选择"
                         className="w-full h-11 px-1 bg-white border-0 border-b border-gray-200 text-sm outline-none focus:border-emerald-400"
                     />
+                    {frequentFoods.length > 0 && (
+                        <div className="mt-3 rounded-xl bg-emerald-50/70 p-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs font-semibold text-emerald-700">近7天常用 · 点击即添加</p>
+                                <span className="text-[10px] text-emerald-500">无需二次确认</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                {frequentFoods.map((food) => (
+                                    <button
+                                        key={food.name}
+                                        onClick={() => handleInstantAdd(food)}
+                                        disabled={saving}
+                                        className="min-h-11 rounded-lg bg-white px-2 py-2 text-left active:scale-95 transition-transform disabled:opacity-60"
+                                    >
+                                        <span className="block text-xs font-semibold text-gray-700 truncate">{food.name}</span>
+                                        <span className="text-[10px] text-gray-400">{food.calories}kcal · {food.count}次</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
                         {COMMON_FOODS.map((food) => <button key={food.name} onClick={() => setForm((current) => ({ ...current, name: food.name, calories: String(food.calories) }))} className="whitespace-nowrap px-3 h-8 rounded-full bg-emerald-50 text-emerald-600 text-xs font-semibold">{food.name}</button>)}
                     </div>
@@ -204,15 +245,18 @@ export default function AddDietPage() {
                 </div>
             </div>
 
-            <button onClick={handleSave} className="w-full h-11 rounded-lg bg-emerald-400 text-white text-sm font-bold shadow-sm active:scale-95 transition-transform">确认添加</button>
+            <button onClick={handleSave} disabled={saving || !form.name.trim() || !form.calories} className="w-full h-11 rounded-lg bg-emerald-400 text-white text-sm font-bold shadow-sm active:scale-95 transition-transform disabled:bg-gray-200 disabled:text-gray-400 disabled:scale-100">{saving ? '保存中...' : '确认添加'}</button>
 
             {mealOpen && (
                 <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 px-4 pb-4" onClick={() => setMealOpen(false)}>
                     <div className="w-full max-w-[420px] rounded-t-2xl rounded-b-xl bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
                         <h3 className="text-base font-bold text-gray-800 mb-3">选择餐次</h3>
                         <div className="grid grid-cols-4 gap-2">
-                            {MEALS.map((meal) => <button key={meal.id} onClick={() => { setForm((current) => ({ ...current, meal: meal.id })); setMealOpen(false) }} className={`h-20 rounded-lg text-sm font-semibold ${form.meal === meal.id ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-50 text-gray-600'}`}><span className="block text-2xl mb-1">{meal.emoji}</span>{meal.label}</button>)}
+                            {MEALS.map((meal) => <button key={meal.id} onClick={() => { setForm((current) => ({ ...current, meal: meal.id })); setMealOpen(false) }} className={`h-20 rounded-lg text-sm font-semibold active:scale-95 transition-transform ${form.meal === meal.id ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-50 text-gray-600'}`}><span className="block text-2xl mb-1">{meal.emoji}</span>{meal.label}</button>)}
                         </div>
+                        <button onClick={() => { setPreferredMeal(form.meal); toast.success('已记住本次餐次'); setMealOpen(false) }} className="mt-4 w-full h-11 rounded-lg bg-emerald-400 text-white text-sm font-semibold active:scale-95 transition-transform">
+                            默认选中本次餐次
+                        </button>
                     </div>
                 </div>
             )}

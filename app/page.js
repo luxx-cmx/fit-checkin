@@ -4,12 +4,15 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   addHealthRecord,
+  getDietRecords,
+  getHealthRecords,
   getTodayCalories,
   getTodayDiet,
   getLatestWeight,
   getProfile,
   getWeightRecords,
   todayStr,
+  yesterdayStr,
   getTodayHealth,
   trackEvent,
 } from '@/lib/store'
@@ -80,6 +83,24 @@ function CalorieRing({ consumed, target }) {
 
 const MEAL_LABEL = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' }
 
+function changeText(current, previous, unit = '') {
+  if (current === null || current === undefined || current === '' || previous === null || previous === undefined || previous === '') return '暂无昨日对比'
+  const delta = Number(current) - Number(previous)
+  if (!Number.isFinite(delta)) return '暂无昨日对比'
+  if (Math.abs(delta) < 0.05) return '与昨日持平 →'
+  const arrow = delta > 0 ? '↑' : '↓'
+  const sign = delta > 0 ? '+' : ''
+  return `较昨日 ${arrow} ${sign}${delta.toFixed(unit === 'kg' ? 1 : 0)}${unit}`
+}
+
+function changeTone(current, previous, preferDown = false) {
+  if (current === null || current === undefined || previous === null || previous === undefined) return 'text-gray-300'
+  const delta = Number(current) - Number(previous)
+  if (Math.abs(delta) < 0.05) return 'text-gray-400'
+  const good = preferDown ? delta < 0 : delta > 0
+  return good ? 'text-emerald-500' : 'text-amber-500'
+}
+
 export default function Home() {
   const [d, setD] = useState({
     calories: 0,
@@ -90,20 +111,35 @@ export default function Home() {
     water: 0,
     steps: 0,
     weightTrend: [],
+    weightTrend3: [],
     recentDiet: [],
     advice: '',
+    yesterdayCalories: 0,
+    yesterdayWeight: null,
+    yesterdayWater: 0,
+    yesterdaySteps: 0,
   })
   const [quick, setQuick] = useState(null)
   const [syncFailed, setSyncFailed] = useState(false)
 
   const loadDashboard = () => {
     const profile = getProfile()
+    const yesterday = yesterdayStr()
     const calories = getTodayCalories()
     const weight = getLatestWeight()
+    const dietRecords = getDietRecords()
+    const weightRecords = getWeightRecords()
+    const healthRecords = getHealthRecords()
     const health = getTodayHealth()
     const water = health.filter((h) => h.type === 'water').reduce((s, h) => s + (Number(h.value) || 0), 0)
     const steps = health.filter((h) => h.type === 'steps').reduce((s, h) => s + (Number(h.value) || 0), 0)
-    const wr = getWeightRecords().slice(0, 20).reverse()
+    const yesterdayCalories = dietRecords.filter((r) => r.date === yesterday).reduce((s, r) => s + (Number(r.calories) || 0), 0)
+    const yesterdayHealth = healthRecords.filter((h) => h.date === yesterday)
+    const yesterdayWater = yesterdayHealth.filter((h) => h.type === 'water').reduce((s, h) => s + (Number(h.value) || 0), 0)
+    const yesterdaySteps = yesterdayHealth.filter((h) => h.type === 'steps').reduce((s, h) => s + (Number(h.value) || 0), 0)
+    const weightAtOrBefore = (date) => [...weightRecords].reverse().filter((r) => r.date <= date).at(-1)?.weight || null
+    const yesterdayWeight = weightAtOrBefore(yesterday)
+    const wr = weightRecords.slice(0, 20).reverse()
     const targetCalories = Number(profile.dailyCalories) || 1800
     const advice = calories === 0
       ? '先记录今天第一餐，就能生成更贴合的热量建议。'
@@ -121,8 +157,13 @@ export default function Home() {
       water,
       steps,
       weightTrend: wr.map((r) => parseFloat(r.weight)),
+      weightTrend3: wr.slice(-3).map((r) => parseFloat(r.weight)),
       recentDiet: getTodayDiet().slice(0, 5),
       advice,
+      yesterdayCalories,
+      yesterdayWeight,
+      yesterdayWater,
+      yesterdaySteps,
     })
   }
 
@@ -232,6 +273,10 @@ export default function Home() {
             }`}>
             {d.calories > d.target ? `⚠️ 超出 ${d.calories - d.target} kcal` : `✅ 剩余 ${d.target - d.calories} kcal`}
           </div>
+          <p className={`mt-1 text-xs ${changeTone(d.calories, d.yesterdayCalories, false)}`}>{changeText(d.calories, d.yesterdayCalories, 'kcal')}</p>
+          <div className="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+            <div className={`h-full rounded-full ${d.calories > d.target ? 'bg-red-400' : 'bg-emerald-400'}`} style={{ width: `${Math.min(100, Math.round((d.calories / (d.target || 1)) * 100))}%` }} />
+          </div>
         </div>
       </div>
 
@@ -247,14 +292,18 @@ export default function Home() {
       {/* Stats Row — cards with left accent border */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: '体重', value: d.weight ?? '--', unit: 'kg', border: 'border-l-emerald-400', text: 'text-emerald-600' },
-          { label: '饮水', value: d.water || '今日未记录', unit: d.water ? 'ml' : '', target: `目标 ${d.waterTarget}ml`, action: '+添加', onClick: () => openQuick('water'), border: 'border-l-blue-300', text: 'text-blue-500' },
-          { label: '步数', value: d.steps || '今日未记录', unit: d.steps ? '步' : '', target: `目标 ${d.stepsTarget}步`, action: '+录入', onClick: () => openQuick('steps'), border: 'border-l-amber-400', text: 'text-amber-500' },
+          { label: '体重', value: d.weight ?? '--', unit: 'kg', target: changeText(d.weight, d.yesterdayWeight, 'kg'), compareClass: changeTone(d.weight, d.yesterdayWeight, true), border: 'border-l-emerald-400', text: 'text-emerald-600', href: '/weight/add', trend: d.weightTrend3 },
+          { label: '饮水', value: d.water || '今日未记录', unit: d.water ? 'ml' : '', target: d.water ? `${changeText(d.water, d.yesterdayWater, 'ml')} · 目标 ${d.waterTarget}ml` : `目标 ${d.waterTarget}ml`, compareClass: changeTone(d.water, d.yesterdayWater), action: d.water ? '+添加' : '立即添加', onClick: () => openQuick('water'), border: 'border-l-blue-300', text: 'text-blue-500' },
+          { label: '步数', value: d.steps || '今日未记录', unit: d.steps ? '步' : '', target: d.steps ? `${changeText(d.steps, d.yesterdaySteps, '步')} · 目标 ${d.stepsTarget}步` : `目标 ${d.stepsTarget}步`, compareClass: changeTone(d.steps, d.yesterdaySteps), action: d.steps ? '+录入' : '立即录入', onClick: () => openQuick('steps'), border: 'border-l-amber-400', text: 'text-amber-500' },
         ].map((s) => (
           <div key={s.label} className={`bg-white rounded-xl p-3 shadow-sm border-l-4 ${s.border} hover:-translate-y-0.5 transition-transform`}>
-            <div className={`font-bold text-lg ${s.text}`}>{s.value}</div>
+            <div className="flex items-start justify-between gap-2">
+              <div className={`font-bold text-lg ${s.text}`}>{s.value}</div>
+              {s.trend?.length > 1 && <div className="w-16"><MiniLineChart data={s.trend} color="#34d399" height={32} /></div>}
+            </div>
             <div className="text-[11px] text-gray-400 mt-0.5">{s.label} {s.unit}</div>
-            {s.target && <div className="text-[10px] text-gray-300 mt-0.5">{s.target}</div>}
+            {s.target && <div className={`text-[10px] mt-0.5 ${s.compareClass || 'text-gray-300'}`}>{s.target}</div>}
+            {s.href && !d.weight && <Link href={s.href} className="mt-2 inline-block text-[11px] font-semibold text-emerald-600">立即录入</Link>}
             {s.action && <button onClick={s.onClick} className={`mt-2 text-[11px] font-semibold ${s.text}`}>{s.action}</button>}
           </div>
         ))}
@@ -325,7 +374,7 @@ export default function Home() {
           <p className="text-gray-600 text-sm font-medium">今日还未记录饮食</p>
           <p className="text-gray-400 text-xs mt-1">记录每餐，掌握热量摄入</p>
           <Link
-            href="/diet"
+            href="/diet/add"
             className="inline-block mt-4 bg-emerald-400 text-white text-sm px-6 py-2.5 rounded-lg font-semibold shadow-sm active:scale-95 transition-transform"
           >
             去记录

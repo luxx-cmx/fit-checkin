@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/AppDialog'
 import PageHeader from '@/components/PageHeader'
 import { useSkin } from '@/components/SkinProvider'
 import { clearAuth, getToken } from '@/lib/auth-client'
+import { clearLightweightCache, cleanupExpiredCache, getFontSize, setFontSize } from '@/lib/store'
 
 function SettingRow({ icon, title, desc, href, onClick, danger, trailing }) {
     const content = (
@@ -30,8 +31,15 @@ export default function ProfileSettingsPage() {
     const { theme, setTheme } = useTheme()
     const { skin, setSkin, skins } = useSkin()
     const [skinOpen, setSkinOpen] = useState(false)
+    const [fontOpen, setFontOpen] = useState(false)
+    const [font, setFont] = useState('standard')
     const [logoutOpen, setLogoutOpen] = useState(false)
     const currentSkinName = useMemo(() => skins.find((item) => item.id === skin)?.name || '默认', [skin, skins])
+    const fontName = { small: '小号', standard: '标准', large: '大号' }[font] || '标准'
+
+    useEffect(() => {
+        setFont(getFontSize())
+    }, [])
 
     const handleSkinChange = (skinId) => {
         setSkin(skinId)
@@ -42,6 +50,18 @@ export default function ProfileSettingsPage() {
         const nextTheme = theme === 'dark' ? 'light' : 'dark'
         setTheme(nextTheme)
         toast.success(nextTheme === 'dark' ? '已切换深色模式' : '已切换浅色模式')
+    }
+
+    const handleFontChange = (size) => {
+        const next = setFontSize(size)
+        setFont(next)
+        toast.success(`字体已切换为${{ small: '小号', standard: '标准', large: '大号' }[next]}`)
+    }
+
+    const handleCacheCleanup = () => {
+        cleanupExpiredCache(7)
+        clearLightweightCache()
+        toast.success('缓存已清理，近7天记录已保留')
     }
 
     const handleLogout = async () => {
@@ -61,6 +81,7 @@ export default function ProfileSettingsPage() {
                 <SettingRow icon="📊" title="饮水/步数统计" desc="查看当日、本周、本月趋势" href="/health/stats" />
                 <SettingRow icon="⏰" title="消息提醒设置" desc="吃饭、喝水、称重提醒" href="/profile/reminders" />
                 <SettingRow icon="🎨" title="皮肤设置" desc={currentSkinName} onClick={() => setSkinOpen(true)} />
+                <SettingRow icon="🔤" title="字体大小" desc={`当前${fontName}`} onClick={() => setFontOpen(true)} />
                 <SettingRow
                     icon="🌓"
                     title="深浅色模式"
@@ -68,6 +89,7 @@ export default function ProfileSettingsPage() {
                     onClick={handleThemeToggle}
                     trailing={<span className={`px-3 py-1 rounded-full text-xs ${theme === 'dark' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-600'}`}>{theme === 'dark' ? '深色' : '浅色'}</span>}
                 />
+                <SettingRow icon="🧹" title="清理缓存" desc="清理统计缓存和7天前临时记录" onClick={handleCacheCleanup} trailing={<span className="text-xs text-emerald-600 font-semibold">立即清理</span>} />
                 <SettingRow icon="📣" title="更新记录" desc="查看版本迭代日志" href="/profile/updates" />
                 <SettingRow icon="💬" title="意见反馈" desc="提交问题、建议和数据异常" href="/profile/feedback" />
                 <SettingRow icon="❔" title="关于我们 / 使用帮助" desc="产品介绍与常见问题" href="/profile/about" />
@@ -75,6 +97,32 @@ export default function ProfileSettingsPage() {
             </div>
 
             <ConfirmDialog open={logoutOpen} title="确认退出登录？" message="退出后会清除当前登录状态。" confirmText="退出登录" danger onConfirm={handleLogout} onClose={() => setLogoutOpen(false)} />
+
+            {fontOpen && (
+                <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 px-6">
+                    <div className="w-full max-w-[320px] rounded-3xl bg-white p-5 shadow-2xl">
+                        <div className="flex items-center justify-between mb-4">
+                            <div>
+                                <h3 className="text-base font-semibold text-gray-800">字体大小</h3>
+                                <p className="text-xs text-gray-400 mt-0.5">只调整显示密度，不改变功能入口</p>
+                            </div>
+                            <button onClick={() => setFontOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+                        </div>
+                        <div className="space-y-2">
+                            {[
+                                { id: 'small', label: '小号', desc: '信息更紧凑' },
+                                { id: 'standard', label: '标准', desc: '推荐默认' },
+                                { id: 'large', label: '大号', desc: '阅读更轻松' },
+                            ].map((item) => (
+                                <button key={item.id} onClick={() => handleFontChange(item.id)} className={`w-full rounded-2xl border px-4 py-3 text-left transition-all ${font === item.id ? 'border-emerald-400 bg-emerald-50' : 'border-gray-100 bg-white'}`}>
+                                    <span className="block text-sm font-semibold text-gray-700">{item.label}</span>
+                                    <span className="block text-xs text-gray-400 mt-0.5">{item.desc}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {skinOpen && (
                 <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 px-6">

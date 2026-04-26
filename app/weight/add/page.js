@@ -3,35 +3,51 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { addWeightRecord, getLatestWeight, todayStr } from '@/lib/store'
+import { addWeightRecord, getLatestWeight, getWeightRecords, todayStr, trackEvent, yesterdayStr } from '@/lib/store'
 
 export default function AddWeightPage() {
     const router = useRouter()
     const [form, setForm] = useState({ weight: '', date: todayStr(), note: '' })
     const [lastWeight, setLastWeight] = useState('')
+    const [saving, setSaving] = useState(false)
 
     useEffect(() => {
         const latest = getLatestWeight()
         if (latest) {
-            setLastWeight(String(latest))
-            setForm((state) => ({ ...state, weight: String(latest) }))
+            const normalized = Number(latest).toFixed(1)
+            setLastWeight(normalized)
+            setForm((state) => ({ ...state, weight: normalized }))
         }
     }, [])
 
     const handleSave = () => {
+        if (saving) return
         const weight = parseFloat(form.weight)
-        if (!weight) return toast.error('请输入体重')
+        if (!weight) return toast.error('请输入有效数值（如50.5kg），仅支持数字和1位小数')
         if (weight < 20 || weight > 300) return toast.error('体重应在 20~300 kg 之间')
 
-        addWeightRecord({ ...form, weight: String(weight) })
-        toast.success('体重已记录 ⚖️')
-        router.replace('/weight')
+        setSaving(true)
+        addWeightRecord({ ...form, weight: weight.toFixed(1) })
+        trackEvent('weight_add_save', { weight: weight.toFixed(1) })
+        toast.success('体重录入成功 √')
+        window.setTimeout(() => router.replace('/weight'), 250)
     }
 
     const adjustWeight = (delta) => {
         const current = parseFloat(form.weight || '0')
         const next = Math.max(0, current + delta)
         setForm((state) => ({ ...state, weight: next ? next.toFixed(1) : '' }))
+    }
+
+    const fillQuickWeight = (type) => {
+        const records = getWeightRecords()
+        const yesterday = records.find((item) => item.date === yesterdayStr())?.weight || lastWeight
+        const base = Number(yesterday || form.weight || 0)
+        if (!base) return toast.error('暂无可参考的历史体重')
+        const delta = type === 'minus' ? -0.2 : type === 'plus' ? 0.2 : 0
+        const next = Math.max(20, base + delta).toFixed(1)
+        setForm((state) => ({ ...state, weight: next, note: type === 'same' ? '与昨日一致' : `较昨日${delta > 0 ? '+' : ''}${delta.toFixed(1)}kg` }))
+        trackEvent('weight_quick_fill', { type, value: next })
     }
 
     const handleVoice = () => {
@@ -89,6 +105,11 @@ export default function AddWeightPage() {
                         <span>上一次：{lastWeight || '--'} kg</span>
                         <button onClick={handleVoice} className="w-9 h-9 rounded-lg bg-gray-50 text-lg active:scale-95 transition-transform" aria-label="语音输入">🎙️</button>
                     </div>
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                        <button onClick={() => fillQuickWeight('same')} className="h-10 rounded-lg bg-gray-50 text-xs font-semibold text-gray-500 active:scale-95 transition-transform">与昨日一致</button>
+                        <button onClick={() => fillQuickWeight('minus')} className="h-10 rounded-lg bg-emerald-50 text-xs font-semibold text-emerald-600 active:scale-95 transition-transform">较昨日 -0.2kg</button>
+                        <button onClick={() => fillQuickWeight('plus')} className="h-10 rounded-lg bg-blue-50 text-xs font-semibold text-blue-600 active:scale-95 transition-transform">较昨日 +0.2kg</button>
+                    </div>
                 </div>
 
                 <div>
@@ -111,7 +132,7 @@ export default function AddWeightPage() {
                     />
                 </div>
             </div>
-            <button onClick={handleSave} className="w-full h-11 rounded-lg bg-emerald-400 text-white text-sm font-bold shadow-sm active:scale-95 transition-transform">确认保存</button>
+            <button onClick={handleSave} disabled={saving || !form.weight} className="w-full h-11 rounded-lg bg-emerald-400 text-white text-sm font-bold shadow-sm active:scale-95 transition-transform disabled:bg-gray-200 disabled:text-gray-400 disabled:scale-100">{saving ? '保存中...' : '确认保存'}</button>
         </div>
     )
 }

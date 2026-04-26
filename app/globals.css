@@ -7,6 +7,18 @@ body {
   background: #f9fafb;
 }
 
+html[data-syj-font-size='small'] {
+  font-size: 15px;
+}
+
+html[data-syj-font-size='standard'] {
+  font-size: 16px;
+}
+
+html[data-syj-font-size='large'] {
+  font-size: 17px;
+}
+
 html.dark,
 html.dark body {
   background: #0f172a;
