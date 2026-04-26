@@ -1,0 +1,96 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  background: #f9fafb;
+}
+
+html.dark,
+html.dark body {
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+html.dark .bg-white,
+html.dark .bg-white\/90 {
+  background-color: rgba(30, 41, 59, 0.94) !important;
+}
+
+html.dark .bg-gray-50,
+html.dark .bg-gray-100 {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+}
+
+html.dark .text-gray-800,
+html.dark .text-gray-700,
+html.dark .text-gray-600 {
+  color: #e5e7eb !important;
+}
+
+html.dark .text-gray-500,
+html.dark .text-gray-400 {
+  color: #94a3b8 !important;
+}
+
+html.dark .border-gray-100,
+html.dark .border-gray-200 {
+  border-color: rgba(71, 85, 105, 0.8) !important;
+}
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+  color: #e5e7eb !important;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+
+a,
+button,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #34d399;
+  outline-offset: 2px;
+}
+
+@media (min-width: 768px) {
+  html {
+    scroll-padding-top: 3.5rem;
+  }
+}
+
+/* Page transition */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter {
+  animation: fadeIn 0.2s ease;
+}

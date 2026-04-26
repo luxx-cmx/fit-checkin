@@ -1,0 +1,46 @@
+version: '3.8'
+services:
+  app:
+    build: .
+    container_name: shiyuji
+    ports:
+      - "3000:3000"
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - NEXT_PUBLIC_CLOUD_SYNC=1
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      - db
+
+  admin:
+    build: .
+    container_name: shiyuji-admin
+    ports:
+      - "127.0.0.1:3001:3000"
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      - NEXT_PUBLIC_CLOUD_SYNC=1
+      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_MODE=1
+    depends_on:
+      - db
+
+  db:
+    image: postgres:14-alpine
+    container_name: shiyuji-db
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    expose:
+      - "5432"
+
+volumes:
+  pgdata:
