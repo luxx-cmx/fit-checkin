@@ -1,5 +1,8 @@
 import { getPool, ensureSchema } from '@/lib/server-db'
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET() {
     await ensureSchema()
     const pool = getPool()
