@@ -4,6 +4,19 @@ import { useRouter, usePathname } from 'next/navigation'
 import { getToken, clearAuth } from '@/lib/auth-client'
 import { cleanupExpiredCache } from '@/lib/store'
 
+async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 2500) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal })
+    return await res.json().catch(() => ({}))
+  } catch {
+    return {}
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 // 本地某表是否为空
 function localEmpty(key) {
   try {
@@ -23,11 +36,11 @@ async function restoreIfEmpty(token) {
   const headers = { Authorization: `Bearer ${token}` }
   try {
     const [d, w, h, pRes, fRes] = await Promise.all([
-      fetch('/api/sync/diet', { headers }).then(r => r.json()).catch(() => ({})),
-      fetch('/api/sync/weight', { headers }).then(r => r.json()).catch(() => ({})),
-      fetch('/api/sync/health', { headers }).then(r => r.json()).catch(() => ({})),
-      fetch('/api/profile', { headers }).then(r => r.json()).catch(() => ({})),
-      fetch('/api/favorites', { headers }).then(r => r.json()).catch(() => ({})),
+      fetchJsonWithTimeout('/api/sync/diet', { headers }),
+      fetchJsonWithTimeout('/api/sync/weight', { headers }),
+      fetchJsonWithTimeout('/api/sync/health', { headers }),
+      fetchJsonWithTimeout('/api/profile', { headers }),
+      fetchJsonWithTimeout('/api/favorites', { headers }),
     ])
     if (d.rows?.length) localStorage.setItem('syj_diet', JSON.stringify(d.rows))
     if (w.rows?.length) localStorage.setItem('syj_weight', JSON.stringify(w.rows))
@@ -44,6 +57,7 @@ export default function AuthGuard({ children }) {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
+    let alive = true
     if (pathname === '/login') { setReady(true); return }
     cleanupExpiredCache(30)
     const token = getToken()
@@ -51,16 +65,18 @@ export default function AuthGuard({ children }) {
       router.replace('/login')
       return
     }
-    fetch('/api/auth/verify', { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json())
+    fetchJsonWithTimeout('/api/auth/verify', { headers: { Authorization: `Bearer ${token}` } }, 3000)
       .then(async (d) => {
+        if (!alive) return
         if (!d.ok) { clearAuth(); router.replace('/login') }
         else {
-          await restoreIfEmpty(token)  // 本地为空时自动从 DB 恢复
           setReady(true)
+          void restoreIfEmpty(token)  // 改为后台恢复，避免首屏被卡住
         }
       })
-      .catch(() => setReady(true)) // 网络异常时放行（离线模式）
+      .catch(() => { if (alive) setReady(true) }) // 网络异常时放行（离线模式）
+
+    return () => { alive = false }
   }, [pathname])
 
   if (!ready) {

@@ -3,7 +3,9 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { addDietRecord, getFrequentFoods, getPreferredMeal, setPreferredMeal, todayStr, trackEvent } from '@/lib/store'
+import { addDietRecord, deleteDietRecord, getDietRecords, getFrequentFoods, getPreferredMeal, setPreferredMeal, todayStr, trackEvent } from '@/lib/store'
+import { compressImageFile } from '@/lib/image/compress'
+import { markStart, markEnd, trackFunnel } from '@/lib/metrics'
 
 const MEALS = [
     { id: 'breakfast', label: '早餐', emoji: '🌅' },
@@ -20,13 +22,31 @@ const COMMON_FOODS = [
     { name: '西兰花', calories: 34 },
 ]
 
-function fileToDataUrl(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result)
-        reader.onerror = () => reject(new Error('图片读取失败'))
-        reader.readAsDataURL(file)
-    })
+// AI 视觉调用，支持 v1 主接口 + 旧接口降级
+async function callVisionApi(imageDataUrl) {
+    const endpoints = ['/api/v1/ai/vision', '/api/ai/vision']
+    let lastError = null
+    for (const url of endpoints) {
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageDataUrl }),
+            })
+            const data = await res.json().catch(() => ({}))
+            if (res.ok && data?.ok) {
+                return { ok: true, result: data.result, requestId: data.requestId, cached: data.cached }
+            }
+            // 服务端返回 fallback：按文档"降级策略"处理
+            if (data?.fallback) {
+                return { ok: false, soft: true, result: data.fallback, msg: data.msg, code: data.code }
+            }
+            lastError = new Error(data?.msg || `AI 识别失败 (${res.status})`)
+        } catch (e) {
+            lastError = e
+        }
+    }
+    throw lastError || new Error('AI 识别失败')
 }
 
 export default function AddDietPage() {
@@ -40,12 +60,28 @@ export default function AddDietPage() {
         note: '',
     })
     const [mode, setMode] = useState('manual')
-    const [ai, setAi] = useState({ file: null, preview: '', loading: false })
+    const [ai, setAi] = useState({ file: null, preview: '', loading: false, costMs: null })
+    const [aiItems, setAiItems] = useState([]) // 多食材识别结果，可逐项编辑
     const [mealOpen, setMealOpen] = useState(false)
     const [frequentFoods, setFrequentFoods] = useState([])
     const [saving, setSaving] = useState(false)
 
     useEffect(() => {
+        const editId = searchParams.get('edit')
+        if (editId) {
+            const target = getDietRecords().find((r) => String(r.id) === String(editId))
+            if (target) {
+                setForm({
+                    meal: target.meal || 'breakfast',
+                    name: target.name || '',
+                    calories: String(target.calories || ''),
+                    date: target.date || todayStr(),
+                    note: target.note || '',
+                })
+                setFrequentFoods(getFrequentFoods(3, 7))
+                return
+            }
+        }
         setForm((current) => ({
             ...current,
             meal: searchParams.get('meal') || getPreferredMeal() || current.meal,
@@ -57,6 +93,11 @@ export default function AddDietPage() {
         setFrequentFoods(getFrequentFoods(3, 7))
     }, [searchParams])
 
+    useEffect(() => {
+        markStart('diet_add')
+        trackFunnel('diet_add_view')
+    }, [])
+
     const handleSave = () => {
         if (saving) return
         if (!form.name.trim()) return toast.error('请先选择或填写食物名称')
@@ -65,22 +106,40 @@ export default function AddDietPage() {
         if (calories > 5000) return toast.error('单次热量不能超过 5000 kcal')
 
         setSaving(true)
+        const editId = searchParams.get('edit')
+        if (editId) deleteDietRecord(Number(editId))
+        const recordId = Date.now()
         addDietRecord({
+            id: recordId,
             meal: form.meal,
             name: form.name.trim(),
             calories,
             date: form.date,
             note: form.note.trim(),
         })
-        trackEvent('diet_add_save', { mode: form.note.includes('AI识别') ? 'ai' : 'manual', meal: form.meal, calories })
-        toast.success('饮食添加成功 √')
+        trackEvent(editId ? 'diet_edit_save' : 'diet_add_save', { mode: form.note.includes('AI识别') ? 'ai' : 'manual', meal: form.meal, calories })
+        trackFunnel('diet_add_save')
+        markEnd('diet_add', { meal: form.meal, mode: form.note.includes('AI识别') ? 'ai' : 'manual' })
+        toast.success('饮食添加成功 √', {
+            duration: 3000,
+            action: {
+                label: '撤销',
+                onClick: () => {
+                    deleteDietRecord(recordId)
+                    trackEvent('diet_add_undo', { meal: form.meal })
+                    toast.info('已撤销本次添加，可在“回收站” 7 天内恢复')
+                },
+            },
+        })
         window.setTimeout(() => router.replace('/diet'), 250)
     }
 
     const handleInstantAdd = (food) => {
         if (saving) return
         setSaving(true)
+        const recordId = Date.now()
         addDietRecord({
+            id: recordId,
             meal: form.meal,
             name: food.name,
             calories: Number(food.calories) || 0,
@@ -88,7 +147,17 @@ export default function AddDietPage() {
             note: '常用食物一键添加',
         })
         trackEvent('diet_quick_food_add', { name: food.name, meal: form.meal })
-        toast.success(`已添加 ${food.name} √`)
+        toast.success(`已添加 ${food.name} √`, {
+            duration: 3000,
+            action: {
+                label: '撤销',
+                onClick: () => {
+                    deleteDietRecord(recordId)
+                    trackEvent('diet_quick_food_undo', { name: food.name })
+                    toast.info('已撤销')
+                },
+            },
+        })
         window.setTimeout(() => router.replace('/diet'), 650)
     }
 
@@ -105,24 +174,37 @@ export default function AddDietPage() {
         if (!ai.file) return toast.error('请先上传餐食图片')
         setAi((state) => ({ ...state, loading: true }))
         try {
-            const imageDataUrl = await fileToDataUrl(ai.file)
-            const res = await fetch('/api/ai/vision', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ imageDataUrl }),
-            })
-            const data = await res.json().catch(() => ({}))
-            if (!res.ok || !data.ok) throw new Error(data.msg || 'AI 识别失败')
+            // 客户端压缩，降低请求体积与豆包 API 流量
+            const compressed = await compressImageFile(ai.file, { maxSide: 1024, quality: 0.8 })
+            const data = await callVisionApi(compressed.dataUrl)
             const result = data.result || {}
+            const tip = result.tip ? `｜${result.tip}` : ''
+            const items = Array.isArray(result.items) ? result.items : []
+            setAiItems(items)
             setForm((current) => ({
                 ...current,
                 name: result.name || '餐食识别结果',
                 calories: String(result.calories || 450),
-                note: result.note ? `AI识别：${result.note}` : 'AI识别初稿，可按实际分量和烹饪方式调整',
+                note: result.note
+                    ? `AI识别：${result.note}${tip}`
+                    : `AI识别初稿，可按实际分量和烹饪方式调整${tip}`,
             }))
-            setAi((state) => ({ ...state, loading: false }))
-            trackEvent('ai_meal_recognize', { name: result.name, calories: result.calories, confidence: result.confidence })
-            toast.success('已生成识别建议，请确认后保存')
+            setAi((state) => ({ ...state, loading: false, costMs: data.costMs ?? null }))
+            trackEvent('ai_meal_recognize', {
+                name: result.name,
+                calories: result.calories,
+                confidence: result.confidence,
+                bytes: compressed.bytes,
+                cached: !!data.cached,
+                soft: !!data.soft,
+                costMs: data.costMs,
+            })
+            const timeLabel = data.costMs ? `（${(data.costMs / 1000).toFixed(1)}s）` : ''
+            if (data.soft) {
+                toast.warning(data.msg ? `${data.msg}，已为你填入占位值` : 'AI 暂不可用，已填入占位值')
+            } else {
+                toast.success(data.cached ? `命中缓存，已生成建议${timeLabel}` : `已生成识别建议${timeLabel}，请确认后保存`)
+            }
         } catch (e) {
             setAi((state) => ({ ...state, loading: false }))
             trackEvent('ai_meal_recognize_failed', { message: e.message })
@@ -184,7 +266,67 @@ export default function AddDietPage() {
                                 </label>
                                 <button onClick={handleAiRecognize} disabled={ai.loading} className="h-11 rounded-lg bg-purple-400 text-white text-sm font-semibold disabled:opacity-60">{ai.loading ? '识别中...' : '生成建议'}</button>
                             </div>
-                            <p className="text-xs text-purple-500 leading-5">已接入豆包视觉模型：会根据餐食图片给出可编辑的名称与热量建议，保存前仍可修改。</p>
+                            <p className="text-xs text-purple-500 leading-5">已接入豆包视觉模型：会根据餐食图片给出可编辑的名称与热量建议，保存前仍可修改。{ai.costMs ? <span className="ml-1 text-gray-400">上次识别耗时 {(ai.costMs/1000).toFixed(1)}s</span> : null}</p>
+                            {aiItems.length > 0 && (
+                                <div className="rounded-xl bg-white p-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-xs font-semibold text-purple-700">识别出 {aiItems.length} 项·可逐项调整</p>
+                                        <span className="text-[10px] text-gray-400">总热量 {aiItems.reduce((s, it) => s + (Number(it.calories) || 0), 0)} kcal</span>
+                                    </div>
+                                    {aiItems.map((it, idx) => (
+                                        <div key={idx} className="grid grid-cols-12 gap-1.5 items-center">
+                                            <input
+                                                value={it.name}
+                                                onChange={(e) => setAiItems((arr) => arr.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
+                                                className="col-span-5 h-9 px-2 rounded-lg bg-gray-50 border border-gray-200 text-xs outline-none focus:border-purple-300"
+                                            />
+                                            <input
+                                                type="number"
+                                                value={it.grams}
+                                                onChange={(e) => {
+                                                    const grams = Math.max(1, Number(e.target.value) || 0)
+                                                    setAiItems((arr) => arr.map((x, i) => {
+                                                        if (i !== idx) return x
+                                                        // 同比缩放热量
+                                                        const ratio = grams / Math.max(1, Number(x.grams) || 1)
+                                                        return { ...x, grams, calories: Math.round((Number(x.calories) || 0) * ratio) }
+                                                    }))
+                                                }}
+                                                className="col-span-3 h-9 px-2 rounded-lg bg-gray-50 border border-gray-200 text-xs outline-none focus:border-purple-300"
+                                            />
+                                            <input
+                                                type="number"
+                                                value={it.calories}
+                                                onChange={(e) => setAiItems((arr) => arr.map((x, i) => i === idx ? { ...x, calories: Number(e.target.value) || 0 } : x))}
+                                                className="col-span-3 h-9 px-2 rounded-lg bg-gray-50 border border-gray-200 text-xs outline-none focus:border-purple-300"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setAiItems((arr) => arr.filter((_, i) => i !== idx))}
+                                                className="col-span-1 h-9 rounded-lg text-gray-300 hover:text-red-400 text-sm"
+                                                aria-label="删除"
+                                            >✕</button>
+                                        </div>
+                                    ))}
+                                    <div className="grid grid-cols-12 gap-1.5 text-[10px] text-gray-400 px-1">
+                                        <span className="col-span-5">名称</span>
+                                        <span className="col-span-3">克重 g</span>
+                                        <span className="col-span-3">热量 kcal</span>
+                                        <span className="col-span-1"></span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const total = aiItems.reduce((s, it) => s + (Number(it.calories) || 0), 0)
+                                            const name = aiItems.map((it) => it.name).filter(Boolean).join(' + ') || form.name
+                                            setForm((c) => ({ ...c, name, calories: String(total) }))
+                                            trackEvent('ai_meal_items_apply', { count: aiItems.length, total })
+                                            toast.success(`已应用调整：${total} kcal`)
+                                        }}
+                                        className="w-full h-9 rounded-lg bg-purple-100 text-purple-700 text-xs font-semibold active:scale-95 transition-transform"
+                                    >应用调整后的总热量到上方表单</button>
+                                </div>
+                            )}
                         </div>
                     )}
                     <input

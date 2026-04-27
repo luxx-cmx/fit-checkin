@@ -22,6 +22,7 @@ export default function DietPage() {
   const [records, setRecords] = useState([])
   const [selectedDate, setSelectedDate] = useState(todayStr())
   const [deleteId, setDeleteId] = useState(null)
+  const [showFull, setShowFull] = useState(null)
 
   const load = () => {
     setRecords(getDietRecords())
@@ -35,7 +36,9 @@ export default function DietPage() {
     deleteDietRecord(id)
     load()
     setDeleteId(null)
-    toast.success('已删除')
+    toast.success('已删除，7 天内可在“回收站”恢复', {
+      action: { label: '去看看', onClick: () => { window.location.href = '/profile/trash' } },
+    })
   }
 
   const handleCopyYesterday = () => {
@@ -112,14 +115,23 @@ export default function DietPage() {
               <span className="text-sm text-emerald-500 font-semibold">{mealCals} kcal</span>
             </div>
             {items.map((r) => (
-              <div key={r.id} className="flex items-center justify-between px-4 py-3 border-t border-gray-50">
-                <span className="text-sm text-gray-700">{r.name}</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-emerald-500 font-semibold">{r.calories} kcal</span>
-                  <button onClick={() => setDeleteId(r.id)} className="text-gray-300 hover:text-red-400 text-base">
-                    🗑
-                  </button>
-                </div>
+              <div key={r.id} className="flex items-center gap-2 px-4 py-3 border-t border-gray-50">
+                <button
+                  onClick={() => setShowFull({ name: r.name, calories: r.calories })}
+                  className="flex-1 min-w-0 text-left active:opacity-60"
+                  title={r.name}
+                >
+                  <span className="block text-sm text-gray-700 truncate">{r.name}</span>
+                </button>
+                <span className="text-sm text-emerald-500 font-bold tabular-nums whitespace-nowrap">{r.calories} kcal</span>
+                <Link
+                  href={`/diet/add?edit=${encodeURIComponent(r.id)}&date=${encodeURIComponent(selectedDate)}`}
+                  className="text-gray-300 hover:text-emerald-500 text-sm px-1"
+                  aria-label="编辑"
+                >✎</Link>
+                <button onClick={() => setDeleteId(r.id)} className="text-gray-300 hover:text-red-400 text-base" aria-label="删除">
+                  🗑
+                </button>
               </div>
             ))}
           </div>
@@ -142,6 +154,18 @@ export default function DietPage() {
       )}
 
       <ConfirmDialog open={Boolean(deleteId)} title="确认删除这条饮食记录？" message="删除后将无法恢复。" confirmText="删除" danger onConfirm={() => handleDelete(deleteId)} onClose={() => setDeleteId(null)} />
+
+      {/* 完整名称查看弹窗 */}
+      {showFull && (
+        <div onClick={() => setShowFull(null)} className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-6">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl p-5 max-w-sm w-full shadow-xl">
+            <p className="text-xs text-gray-400 mb-2">完整食物名称</p>
+            <p className="text-sm text-gray-800 leading-6 break-words">{showFull.name}</p>
+            <p className="text-emerald-500 font-bold mt-3">{showFull.calories} kcal</p>
+            <button onClick={() => setShowFull(null)} className="mt-4 w-full h-10 rounded-xl bg-emerald-400 text-white text-sm font-semibold">关闭</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

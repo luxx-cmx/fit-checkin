@@ -90,7 +90,7 @@ export default function ProfileSettingsPage() {
                     trailing={<span className={`px-3 py-1 rounded-full text-xs ${theme === 'dark' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-600'}`}>{theme === 'dark' ? '深色' : '浅色'}</span>}
                 />
                 <SettingRow icon="🧹" title="清理缓存" desc="清理统计缓存和7天前临时记录" onClick={handleCacheCleanup} trailing={<span className="text-xs text-emerald-600 font-semibold">立即清理</span>} />
-                <SettingRow icon="📣" title="更新记录" desc="查看版本迭代日志" href="/profile/updates" />
+                <SettingRow icon="�️" title="回收站" desc="误删的饮食/体重记录可在 7 天内恢复" href="/profile/trash" />                <SettingRow icon="🧠" title="建议历史" desc="查看每日个性化建议记录" href="/profile/advice" />                <SettingRow icon="�📣" title="更新记录" desc="查看版本迭代日志" href="/profile/updates" />
                 <SettingRow icon="💬" title="意见反馈" desc="提交问题、建议和数据异常" href="/profile/feedback" />
                 <SettingRow icon="❔" title="关于我们 / 使用帮助" desc="产品介绍与常见问题" href="/profile/about" />
                 <SettingRow icon="🚪" title="退出登录" desc="清除登录状态并返回登录页" onClick={() => setLogoutOpen(true)} danger />

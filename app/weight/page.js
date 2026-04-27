@@ -58,6 +58,7 @@ export default function WeightPage() {
   const [records, setRecords] = useState([])
   const [profile, setProfile] = useState({})
   const [deleteId, setDeleteId] = useState(null)
+  const [period, setPeriod] = useState(30) // 7 / 30 / 90
 
   const load = () => {
     setRecords(getWeightRecords())
@@ -69,11 +70,13 @@ export default function WeightPage() {
     deleteWeightRecord(id)
     load()
     setDeleteId(null)
-    toast.success('已删除')
+    toast.success('已删除，7 天内可在“回收站”恢复', {
+      action: { label: '去看看', onClick: () => { window.location.href = '/profile/trash' } },
+    })
   }
 
   const chartData = [...records]
-    .slice(0, 30)
+    .slice(0, period)
     .reverse()
     .map((r) => ({ v: parseFloat(r.weight), date: r.date }))
 
@@ -96,8 +99,8 @@ export default function WeightPage() {
             {latest?.weight ?? '--'} <span className="text-lg font-normal text-gray-400">kg</span>
           </p>
           {diff !== null && (
-            <p className={`text-sm mt-1.5 font-medium ${parseFloat(diff) > 0 ? 'text-red-500' : parseFloat(diff) < 0 ? 'text-green-600' : 'text-gray-400'}`}>
-              {parseFloat(diff) > 0 ? '↑ +' : parseFloat(diff) < 0 ? '↓ ' : '— '}
+            <p className={`text-sm mt-1.5 font-medium ${parseFloat(diff) > 0 ? 'text-orange-500' : parseFloat(diff) < 0 ? 'text-green-600' : 'text-gray-400'}`}>
+              {parseFloat(diff) > 0 ? '→ +' : parseFloat(diff) < 0 ? '↓ ' : '— '}
               {diff} kg（较上次）
             </p>
           )}
@@ -108,7 +111,7 @@ export default function WeightPage() {
             <p className="text-xl font-bold text-green-600">{profile.targetWeight} kg</p>
             {latest && (
               <p className="text-xs text-gray-400 mt-0.5">
-                差 {Math.abs(parseFloat(latest.weight) - parseFloat(profile.targetWeight)).toFixed(1)} kg
+                距目标还有 {Math.abs(parseFloat(latest.weight) - parseFloat(profile.targetWeight)).toFixed(1)} kg，加油～
               </p>
             )}
           </div>
@@ -118,7 +121,18 @@ export default function WeightPage() {
       {/* Chart */}
       {chartData.length > 1 && (
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">体重趋势（近30天）</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-700">体重趋势</h3>
+            <div className="flex gap-1 bg-gray-50 p-0.5 rounded-lg">
+              {[7, 30, 90].map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setPeriod(p)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${period === p ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
+                >近{p === 90 ? '3个月' : p + '天'}</button>
+              ))}
+            </div>
+          </div>
           <WeightChart data={chartData} />
         </div>
       )}
@@ -147,7 +161,7 @@ export default function WeightPage() {
                   {r.note && <span className="text-xs text-gray-400 ml-2">{r.note}</span>}
                   {d !== null && (
                     <span
-                      className={`text-xs ml-2 font-medium ${parseFloat(d) > 0 ? 'text-red-400' : parseFloat(d) < 0 ? 'text-green-500' : 'text-gray-300'}`}
+                      className={`text-xs ml-2 font-medium ${parseFloat(d) > 0 ? 'text-orange-400' : parseFloat(d) < 0 ? 'text-green-500' : 'text-gray-300'}`}
                     >
                       {parseFloat(d) > 0 ? '+' : ''}
                       {d}

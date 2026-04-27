@@ -8,16 +8,20 @@ import { ConfirmDialog } from '@/components/AppDialog'
 import { clearAuth, getUser } from '@/lib/auth-client'
 import { getDietRecords, getHealthRecords, getProfile, getWeightRecords } from '@/lib/store'
 
-function StatCard({ label, value, unit, accent = 'text-emerald-600' }) {
-    return (
-        <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+function StatCard({ label, value, unit, accent = 'text-emerald-600', href }) {
+    const inner = (
+        <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 active:scale-95 transition-transform">
             <p className={`text-xl font-bold ${accent}`}>
                 {value}
                 <span className="text-xs text-gray-400 ml-1">{unit}</span>
             </p>
-            <p className="text-xs text-gray-400 mt-1">{label}</p>
+            <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                {label}
+                {href && <span className="text-gray-300">›</span>}
+            </p>
         </div>
     )
+    return href ? <Link href={href}>{inner}</Link> : inner
 }
 
 function EntryCard({ href, icon, title, desc }) {
@@ -40,6 +44,7 @@ export default function ProfilePage() {
     const [user, setUser] = useState(null)
     const [profile, setProfile] = useState({})
     const [stats, setStats] = useState({ recordDays: 0, avgCalorie: 0, weightChange: '0.0' })
+    const [gamification, setGamification] = useState({ level: { level: 1, exp: 0 }, points: 0, achievements: [], badges: [] })
     const [logoutOpen, setLogoutOpen] = useState(false)
 
     useEffect(() => {
@@ -60,6 +65,9 @@ export default function ProfilePage() {
             avgCalorie: days.size ? Math.round(totalCalories / days.size) : 0,
             weightChange,
         })
+        const token = localStorage.getItem('syj_token')
+        if (token) fetch('/api/social/gamification', { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => r.json()).then(d => { if (d.data) setGamification(d.data) }).catch(() => { })
     }, [])
 
     const displayName = profile.nickname || profile.name || user?.username || '食愈记用户'
@@ -94,10 +102,38 @@ export default function ProfilePage() {
             </div>
 
             <div className="grid grid-cols-3 gap-3">
-                <StatCard label="记录天数" value={stats.recordDays} unit="天" />
-                <StatCard label="平均热量" value={stats.avgCalorie} unit="kcal" />
-                <StatCard label="体重变化" value={weightValue} unit="kg" accent={weightAccent} />
+                <StatCard label="记录天数" value={stats.recordDays} unit="天" href="/analysis" />
+                <StatCard label="平均热量" value={stats.avgCalorie} unit="kcal" href="/analysis" />
+                <StatCard label="体重变化" value={weightValue} unit="kg" accent={weightAccent} href="/weight" />
             </div>
+
+            {/* 成就勋章 */}
+            <Link href="/social/games" className="block bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 shadow-sm border border-amber-100 active:scale-95 transition-transform">
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                        <span className="text-lg">🏆</span>
+                        <h3 className="text-sm font-semibold text-gray-700">成就勋章</h3>
+                    </div>
+                    <span className="text-[11px] text-gray-400">Lv.{gamification.level.level} · {gamification.points} 积分 ›</span>
+                </div>
+                {gamification.achievements.length ? (
+                    <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                        {gamification.achievements.slice(0, 8).map((a) => (
+                            <div
+                                key={a.achievement_key}
+                                className={`shrink-0 w-16 flex flex-col items-center text-center ${a.is_unlocked ? '' : 'opacity-40 grayscale'}`}
+                            >
+                                <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-2xl mb-1">
+                                    {a.is_unlocked ? '🎖️' : '🔒'}
+                                </div>
+                                <p className="text-[10px] text-gray-500 leading-tight truncate w-full">{a.achievement_name}</p>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-xs text-gray-400 text-center py-2">完成记录可解锁勋章，点这里查看全部挑战 ›</p>
+                )}
+            </Link>
 
             <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-gray-100">
                 <EntryCard href="/profile/info" icon="👤" title="个人信息编辑" desc="昵称、头像、基础资料" />

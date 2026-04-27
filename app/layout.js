@@ -4,6 +4,7 @@ import ThemeProvider from '@/components/ThemeProvider'
 import AuthGuard from '@/components/AuthGuard'
 import SkinProvider from '@/components/SkinProvider'
 import BrowserNotice from '@/components/BrowserNotice'
+import OfflineBanner from '@/components/OfflineBanner'
 import { Toaster } from 'sonner'
 
 export const metadata = {
@@ -26,6 +27,7 @@ export default function RootLayout({ children }) {
           <SkinProvider>
             <AuthGuard>
               <BrowserNotice />
+              <OfflineBanner />
               <main className="min-h-screen w-full max-w-[1200px] mx-auto pb-20 md:pt-14 md:pb-8 page-enter">{children}</main>
               <BottomNav />
             </AuthGuard>

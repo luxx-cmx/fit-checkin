@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import PageHeader from '@/components/PageHeader'
-import { getDietRecords, getHealthRecords, getProfile, getWeightRecords, todayStr } from '@/lib/store'
+import { SkeletonCard } from '@/components/Skeleton'
+import { toast } from 'sonner'
+import { getDietRecords, getHealthRecords, getProfile, getWeightRecords, todayStr, trackEvent } from '@/lib/store'
 
 function lastDays(n = 7) {
     return Array.from({ length: n }, (_, i) => {
@@ -80,6 +82,48 @@ function DualTrend({ trend }) {
 export default function AnalysisPage() {
     const [period, setPeriod] = useState(7)
     const [data, setData] = useState(buildLocalSummary(7))
+    const [aiAnalysis, setAiAnalysis] = useState({ loading: false, text: '', costMs: null })
+
+    const handleAiAnalysis = async (mode = 'normal') => {
+        if (aiAnalysis.loading) return
+        setAiAnalysis((s) => ({ ...s, loading: true, text: '' }))
+        try {
+            const profile = getProfile()
+            const recentFoods = getDietRecords().filter((r) => r.date === todayStr()).map((r) => r.name)
+            const res = await fetch('/api/v1/ai/analysis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    calories: data.today.calories,
+                    target: data.today.target,
+                    water: data.today.water || null,
+                    waterTarget: Number(profile.dailyWater) || 2000,
+                    steps: data.today.steps || null,
+                    stepsTarget: Number(profile.dailySteps) || 8000,
+                    weight: data.body.weight || null,
+                    bmi: data.body.bmi || null,
+                    avgAttainment: data.correlation.avgAttainment,
+                    weightDelta: data.correlation.weightDelta,
+                    missedDays: data.correlation.trend?.filter((d) => d.calories > data.today.target || d.calories === 0).length,
+                    period,
+                    recentFoods,
+                    mode,
+                    extraContext: `近${period}天热量达标率${data.correlation.avgAttainment}%，${data.correlation.relationText}`,
+                }),
+            })
+            const d = await res.json()
+            if (d.ok) {
+                setAiAnalysis({ loading: false, text: d.text, costMs: d.costMs })
+                trackEvent('ai_analysis_page', { mode, costMs: d.costMs, period })
+            } else {
+                setAiAnalysis({ loading: false, text: '', costMs: null })
+                toast.error(d.msg || 'AI 分析失败')
+            }
+        } catch (e) {
+            setAiAnalysis({ loading: false, text: '', costMs: null })
+            toast.error('AI 分析失败，请稍后重试')
+        }
+    }
     useEffect(() => {
         const refresh = () => setData(buildLocalSummary(period))
         refresh()
@@ -109,6 +153,37 @@ export default function AnalysisPage() {
             <div className="grid grid-cols-3 gap-2">{[7, 14, 30].map((value) => <button key={value} onClick={() => setPeriod(value)} className={`py-3 rounded-2xl text-sm font-semibold ${period === value ? 'bg-emerald-400 text-white' : 'bg-white text-gray-500'}`}>近{value}天</button>)}</div>
             <div className="grid grid-cols-2 gap-3">{cards.map(([label, value, unit]) => <div key={label} className="bg-white rounded-3xl p-4 shadow-sm"><p className="text-xs text-gray-400">{label}</p><p className="text-2xl font-bold text-emerald-600 mt-1">{value}<span className="text-xs text-gray-400 ml-1">{unit}</span></p></div>)}</div>
             <div className="bg-white rounded-3xl p-4 shadow-sm"><h3 className="font-semibold text-gray-700 mb-3">智能建议</h3><div className="space-y-2">{data.advice.map((a, i) => <p key={i} className="text-sm text-gray-500 bg-emerald-50 rounded-2xl px-3 py-2">{a}</p>)}</div></div>
+            {/* AI 分析区域 */}
+            <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-3xl p-4 shadow-sm border border-emerald-100">
+                <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xl">🤖</span>
+                        <h3 className="font-semibold text-gray-700">AI 深度分析</h3>
+                    </div>
+                    <span className="text-[10px] text-gray-400">基于近{period}天全量数据</span>
+                </div>
+                {aiAnalysis.loading && !aiAnalysis.text && (
+                    <div className="mb-3"><SkeletonCard /></div>
+                )}
+                {aiAnalysis.text && (
+                    <div className="mb-3 bg-white/80 rounded-2xl p-4 border border-emerald-100">
+                        <p className="text-sm text-gray-600 leading-6">{aiAnalysis.text}</p>
+                        {aiAnalysis.costMs && <p className="text-[10px] text-gray-300 mt-2">分析耗时 {(aiAnalysis.costMs / 1000).toFixed(1)}s</p>}
+                    </div>
+                )}
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => handleAiAnalysis('normal')}
+                        disabled={aiAnalysis.loading}
+                        className="flex-1 h-10 rounded-2xl bg-emerald-400 text-white text-sm font-semibold disabled:opacity-60 active:scale-95 transition-transform"
+                    >{aiAnalysis.loading ? 'AI 分析中...' : `✨ AI 近${period}天小结`}</button>
+                    <button
+                        onClick={() => handleAiAnalysis('deep')}
+                        disabled={aiAnalysis.loading}
+                        className="flex-1 h-10 rounded-2xl bg-blue-500 text-white text-sm font-semibold disabled:opacity-60 active:scale-95 transition-transform"
+                    >{aiAnalysis.loading ? '...' : '🔍 AI 深度建议'}</button>
+                </div>
+            </div>
             <div className="bg-white rounded-3xl p-4 shadow-sm"><div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-gray-700">体重-热量关联分析</h3><span className="text-xs text-gray-400">近{period}天</span></div><DualTrend trend={data.correlation.trend} /><p className="text-sm text-gray-500 bg-blue-50 rounded-2xl px-3 py-2 mt-3 leading-6">{data.correlation.relationText}</p></div>
         </div>
     )

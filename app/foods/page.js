@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { FOOD_CATEGORIES } from '@/lib/foods'
+import { matchFood } from '@/lib/foodSearch'
 import { getFavorites, getRecentFoods, isFavorite, toggleFavorite, trackEvent } from '@/lib/store'
 
 const FILTERS = ['收藏', '最近', ...FOOD_CATEGORIES]
@@ -41,7 +42,7 @@ export default function FoodsPage() {
 
     const foodList = useMemo(() => {
         if (search.trim()) {
-            return allFoods.filter((food) => food.name.includes(search.trim())).slice(0, 60)
+            return allFoods.filter((food) => matchFood(food, search.trim())).slice(0, 60)
         }
         if (filter === '收藏') return favorites.slice(0, 60)
         if (filter === '最近') return getRecentFoods(20)
@@ -177,6 +178,22 @@ export default function FoodsPage() {
                     <button onClick={() => router.push(returnTo)} className="mt-4 px-4 py-2 rounded-xl bg-emerald-50 text-emerald-600 text-sm font-semibold">手动录入</button>
                 </div>
             )}
+
+            {/* 食材反馈入口（PM 文档要求） */}
+            <div className="text-center">
+                <button
+                    type="button"
+                    onClick={() => {
+                        const name = window.prompt('未找到的食材名称？我们将尽快补充：')
+                        if (!name || !name.trim()) return
+                        trackEvent('food_missing_feedback', { name: name.trim(), q: search.trim() })
+                        toast.success('反馈已收到，我们将尽快补充 🙏')
+                    }}
+                    className="text-xs text-gray-400 underline-offset-2 hover:text-emerald-500 hover:underline"
+                >
+                    没找到想要的食物？点这里反馈
+                </button>
+            </div>
 
             {selectedFood && (
                 <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/30 px-4 pb-4">

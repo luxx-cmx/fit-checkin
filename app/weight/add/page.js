@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { addWeightRecord, getLatestWeight, getWeightRecords, todayStr, trackEvent, yesterdayStr } from '@/lib/store'
+import { addWeightRecord, deleteWeightRecord, getLatestWeight, getWeightRecords, todayStr, trackEvent, yesterdayStr } from '@/lib/store'
+import { markStart, markEnd, trackFunnel } from '@/lib/metrics'
 
 export default function AddWeightPage() {
     const router = useRouter()
@@ -20,6 +21,11 @@ export default function AddWeightPage() {
         }
     }, [])
 
+    useEffect(() => {
+        markStart('weight_add')
+        trackFunnel('weight_add_view')
+    }, [])
+
     const handleSave = () => {
         if (saving) return
         const weight = parseFloat(form.weight)
@@ -27,9 +33,22 @@ export default function AddWeightPage() {
         if (weight < 20 || weight > 300) return toast.error('体重应在 20~300 kg 之间')
 
         setSaving(true)
-        addWeightRecord({ ...form, weight: weight.toFixed(1) })
+        const recordId = Date.now()
+        addWeightRecord({ ...form, id: recordId, weight: weight.toFixed(1) })
         trackEvent('weight_add_save', { weight: weight.toFixed(1) })
-        toast.success('体重录入成功 √')
+        trackFunnel('weight_add_save')
+        markEnd('weight_add', { weight: weight.toFixed(1) })
+        toast.success('体重录入成功 √', {
+            duration: 3000,
+            action: {
+                label: '撤销',
+                onClick: () => {
+                    deleteWeightRecord(recordId)
+                    trackEvent('weight_add_undo', { weight: weight.toFixed(1) })
+                    toast.info('已撤销，可在“回收站” 7 天内恢复')
+                },
+            },
+        })
         window.setTimeout(() => router.replace('/weight'), 250)
     }
 

@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
@@ -15,7 +15,10 @@ import {
   yesterdayStr,
   getTodayHealth,
   trackEvent,
+  recordAdvice,
 } from '@/lib/store'
+import { generateAdvice } from '@/lib/advice'
+import { SkeletonCard } from '@/components/Skeleton'
 
 function MiniLineChart({ data, color = '#16a34a', height = 70 }) {
   if (!data || data.length < 2)
@@ -121,6 +124,58 @@ export default function Home() {
   })
   const [quick, setQuick] = useState(null)
   const [syncFailed, setSyncFailed] = useState(false)
+  const [adviceOpen, setAdviceOpen] = useState(false)
+  const [aiAdvice, setAiAdvice] = useState({ loading: false, text: '', costMs: null })
+  // 首页核心入口：长按拖拽排序（PM 文档「个性化适配」）
+  const ENTRY_DEFS = {
+    diet: { href: '/diet/add', icon: '🍱', label: '饮食记录', sub: '选餐次 → 录食物 → 保存', bg: 'bg-emerald-50' },
+    weight: { href: '/weight/add', icon: '⚖️', label: '体重录入', sub: '默认带入上一次体重', bg: 'bg-blue-50' },
+  }
+  const ENTRY_KEYS = ['diet', 'weight']
+  const [entryOrder, setEntryOrder] = useState(ENTRY_KEYS)
+  const [editEntries, setEditEntries] = useState(false)
+  const [pickedEntry, setPickedEntry] = useState(null)
+  const longPressTimer = useRef(null)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('home_entry_order')
+      if (raw) {
+        const arr = JSON.parse(raw)
+        if (Array.isArray(arr) && arr.length === ENTRY_KEYS.length && arr.every((k) => ENTRY_KEYS.includes(k))) {
+          setEntryOrder(arr)
+        }
+      }
+    } catch { }
+  }, [])
+  const persistOrder = (next) => {
+    setEntryOrder(next)
+    try { localStorage.setItem('home_entry_order', JSON.stringify(next)) } catch { }
+  }
+  const startLongPress = () => {
+    if (editEntries) return
+    if (longPressTimer.current) clearTimeout(longPressTimer.current)
+    longPressTimer.current = setTimeout(() => {
+      setEditEntries(true)
+      trackEvent('home_entry_edit_enter')
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(20)
+    }, 500)
+  }
+  const cancelLongPress = () => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null }
+  }
+  const handleEntryTap = (key, e) => {
+    if (!editEntries) return
+    e.preventDefault()
+    if (pickedEntry == null) { setPickedEntry(key); return }
+    if (pickedEntry === key) { setPickedEntry(null); return }
+    const next = [...entryOrder]
+    const i = next.indexOf(pickedEntry)
+    const j = next.indexOf(key)
+    if (i >= 0 && j >= 0) { [next[i], next[j]] = [next[j], next[i]]; persistOrder(next) }
+    setPickedEntry(null)
+    trackEvent('home_entry_swap', { a: pickedEntry, b: key })
+  }
+  const finishEditEntries = () => { setEditEntries(false); setPickedEntry(null) }
 
   const loadDashboard = () => {
     const profile = getProfile()
@@ -141,18 +196,24 @@ export default function Home() {
     const yesterdayWeight = weightAtOrBefore(yesterday)
     const wr = weightRecords.slice(0, 20).reverse()
     const targetCalories = Number(profile.dailyCalories) || 1800
-    const advice = calories === 0
-      ? '先记录今天第一餐，就能生成更贴合的热量建议。'
-      : calories > targetCalories
-        ? '今日热量已超出目标，下一餐建议选择高蛋白、低油盐搭配，无需过度焦虑。'
-        : calories < targetCalories * 0.6
-          ? '今日摄入偏少，可以补充优质碳水和蔬菜，保持稳定节奏。'
-          : '今日摄入节奏不错，继续按当前计划记录即可。'
+    const waterTarget = Number(profile.dailyWater) || 2000
+    const stepsTarget = Number(profile.dailySteps) || 8000
+    const weightDelta = (weight != null && yesterdayWeight != null) ? Number((Number(weight) - Number(yesterdayWeight)).toFixed(2)) : null
+    const advice = generateAdvice({
+      calories,
+      target: targetCalories,
+      weightDelta,
+      water,
+      waterTarget,
+      steps,
+      stepsTarget,
+    })
+    if (advice) recordAdvice(advice, { calories, weight, water, steps })
     setD({
       calories,
       target: targetCalories,
-      waterTarget: Number(profile.dailyWater) || 2000,
-      stepsTarget: Number(profile.dailySteps) || 8000,
+      waterTarget,
+      stepsTarget,
       weight,
       water,
       steps,
@@ -206,6 +267,43 @@ export default function Home() {
     toast.success(quick.type === 'water' ? `饮水已更新，今日已饮 ${nextWater}ml` : `步数已更新，今日 ${nextSteps} 步`)
   }
 
+  const handleAiAnalysis = async (mode = 'normal') => {
+    if (aiAdvice.loading) return
+    setAiAdvice((s) => ({ ...s, loading: true, text: '' }))
+    setAdviceOpen(true)
+    try {
+      const res = await fetch('/api/v1/ai/analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          calories: d.calories,
+          target: d.target,
+          water: d.water || null,
+          waterTarget: d.waterTarget,
+          steps: d.steps || null,
+          stepsTarget: d.stepsTarget,
+          weight: d.weight,
+          weightDelta: d.weight != null && d.yesterdayWeight != null
+            ? Number((Number(d.weight) - Number(d.yesterdayWeight)).toFixed(2))
+            : null,
+          recentFoods: d.recentDiet.map((r) => r.name),
+          mode,
+        }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setAiAdvice({ loading: false, text: data.text, costMs: data.costMs })
+        trackEvent('ai_health_analysis', { mode, costMs: data.costMs })
+      } else {
+        setAiAdvice({ loading: false, text: '', costMs: null })
+        toast.error(data.msg || 'AI 分析失败，请稍后重试')
+      }
+    } catch (e) {
+      setAiAdvice({ loading: false, text: '', costMs: null })
+      toast.error('AI 分析失败，请稍后重试')
+    }
+  }
+
   const greeting = () => {
     const h = new Date().getHours()
     if (h < 6) return '夜深了，注意休息 🌙'
@@ -238,18 +336,52 @@ export default function Home() {
         <Link href="/profile/settings" className="w-9 h-9 rounded-lg bg-white shadow-sm flex items-center justify-center text-gray-500 hover:text-emerald-600">⚙️</Link>
       </div>
 
-      {/* 核心入口区 */}
+      {/* 核心入口区 — 长按可拖拽排序 */}
+      <div className="flex items-center justify-between -mb-1">
+        <span className="text-[11px] text-gray-400">{editEntries ? '点击两个图标交换位置' : '长按图标可调整顺序'}</span>
+        {editEntries && (
+          <button onClick={finishEditEntries} className="text-xs font-semibold text-emerald-600 active:scale-95 transition-transform">完成</button>
+        )}
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Link href="/diet/add" className="min-h-[104px] rounded-xl bg-emerald-50 px-4 py-4 flex flex-col items-center justify-center text-center shadow-sm active:scale-95 md:hover:-translate-y-0.5 transition-transform">
-          <span className="w-16 h-16 rounded-xl bg-white flex items-center justify-center text-4xl shadow-sm">🍱</span>
-          <span className="mt-2 text-sm font-bold text-gray-800">饮食记录</span>
-          <span className="mt-0.5 text-xs text-gray-400">选餐次 → 录食物 → 保存</span>
-        </Link>
-        <Link href="/weight/add" className="min-h-[104px] rounded-xl bg-blue-50 px-4 py-4 flex flex-col items-center justify-center text-center shadow-sm active:scale-95 md:hover:-translate-y-0.5 transition-transform">
-          <span className="w-16 h-16 rounded-xl bg-white flex items-center justify-center text-4xl shadow-sm">⚖️</span>
-          <span className="mt-2 text-sm font-bold text-gray-800">体重录入</span>
-          <span className="mt-0.5 text-xs text-gray-400">默认带入上一次体重</span>
-        </Link>
+        {entryOrder.map((key) => {
+          const def = ENTRY_DEFS[key]
+          if (!def) return null
+          const picked = pickedEntry === key
+          const baseCls = `min-h-[104px] rounded-xl ${def.bg} px-4 py-4 flex flex-col items-center justify-center text-center shadow-sm active:scale-95 md:hover:-translate-y-0.5 transition-transform select-none`
+          const editCls = editEntries ? ' animate-[wiggle_0.4s_ease-in-out_infinite]' : ''
+          const pickedCls = picked ? ' ring-2 ring-emerald-400' : ''
+          const inner = (
+            <>
+              <span className="w-16 h-16 rounded-xl bg-white flex items-center justify-center text-4xl shadow-sm">{def.icon}</span>
+              <span className="mt-2 text-sm font-bold text-gray-800">{def.label}</span>
+              <span className="mt-0.5 text-xs text-gray-400">{def.sub}</span>
+            </>
+          )
+          if (editEntries) {
+            return (
+              <button key={key} type="button" onClick={(e) => handleEntryTap(key, e)} className={baseCls + editCls + pickedCls}>
+                {inner}
+              </button>
+            )
+          }
+          return (
+            <Link
+              key={key}
+              href={def.href}
+              className={baseCls}
+              onTouchStart={startLongPress}
+              onTouchEnd={cancelLongPress}
+              onTouchMove={cancelLongPress}
+              onMouseDown={startLongPress}
+              onMouseUp={cancelLongPress}
+              onMouseLeave={cancelLongPress}
+              onContextMenu={(e) => { e.preventDefault(); setEditEntries(true) }}
+            >
+              {inner}
+            </Link>
+          )
+        })}
       </div>
 
       {syncFailed && (
@@ -268,33 +400,65 @@ export default function Home() {
             {d.calories} <span className="text-sm font-normal text-gray-400">kcal</span>
           </p>
           <div className={`inline-flex items-center gap-1 mt-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${d.calories > d.target
-            ? 'bg-red-50 text-red-500'
+            ? 'bg-orange-50 text-orange-500'
             : 'bg-emerald-50 text-emerald-600'
             }`}>
-            {d.calories > d.target ? `⚠️ 超出 ${d.calories - d.target} kcal` : `✅ 剩余 ${d.target - d.calories} kcal`}
+            {d.calories > d.target ? `今日略超目标 ${d.calories - d.target} kcal，明天轻一点就好啦~` : `还可搾配 ${d.target - d.calories} kcal`}
           </div>
           <p className={`mt-1 text-xs ${changeTone(d.calories, d.yesterdayCalories, false)}`}>{changeText(d.calories, d.yesterdayCalories, 'kcal')}</p>
           <div className="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-            <div className={`h-full rounded-full ${d.calories > d.target ? 'bg-red-400' : 'bg-emerald-400'}`} style={{ width: `${Math.min(100, Math.round((d.calories / (d.target || 1)) * 100))}%` }} />
+            <div className={`h-full rounded-full ${d.calories > d.target ? 'bg-orange-300' : 'bg-emerald-400'}`} style={{ width: `${Math.min(100, Math.round((d.calories / (d.target || 1)) * 100))}%` }} />
           </div>
         </div>
       </div>
 
-      <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-xl p-4 border border-emerald-100 flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-xl shadow-sm">🧠</div>
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-gray-700">今日智能建议</p>
-          <p className="text-xs text-gray-500 leading-5 mt-1">{d.advice}</p>
+      <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-xl p-4 border border-emerald-100">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-xl shadow-sm">🧠</div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-gray-700">AI 轻建议</p>
+              <button onClick={() => setAdviceOpen((v) => !v)} className="text-[11px] font-semibold text-emerald-600 active:scale-95 transition-transform">
+                {adviceOpen ? '收起' : '展开'}
+              </button>
+            </div>
+            <p className={`text-xs text-gray-500 leading-5 mt-1 ${adviceOpen ? '' : 'line-clamp-1'}`}>{d.advice}</p>
+            {/* AI 深度分析结果 */}
+            {adviceOpen && aiAdvice.loading && !aiAdvice.text && (
+              <div className="mt-2"><SkeletonCard /></div>
+            )}
+            {adviceOpen && aiAdvice.text && (
+              <div className="mt-2 bg-white/80 rounded-lg p-3 border border-emerald-100">
+                <p className="text-[11px] font-semibold text-emerald-700 mb-1">✨ AI 深度分析{aiAdvice.costMs ? <span className="ml-1 font-normal text-gray-400">({(aiAdvice.costMs/1000).toFixed(1)}s)</span> : null}</p>
+                <p className="text-xs text-gray-600 leading-5">{aiAdvice.text}</p>
+              </div>
+            )}
+            {adviceOpen && (
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => handleAiAnalysis('normal')}
+                  disabled={aiAdvice.loading}
+                  className="h-7 px-3 rounded-lg bg-emerald-400 text-white text-[11px] font-semibold disabled:opacity-60 active:scale-95 transition-transform"
+                >{aiAdvice.loading ? 'AI 分析中...' : '✨ AI 今日分析'}</button>
+                <button
+                  onClick={() => handleAiAnalysis('deep')}
+                  disabled={aiAdvice.loading}
+                  className="h-7 px-3 rounded-lg bg-blue-400 text-white text-[11px] font-semibold disabled:opacity-60 active:scale-95 transition-transform"
+                >{aiAdvice.loading ? '...' : '🔍 AI 深度建议'}</button>
+                <Link href="/profile/advice" className="h-7 px-3 rounded-lg bg-gray-100 text-gray-500 text-[11px] font-semibold flex items-center">历史记录</Link>
+                <Link href="/analysis" className="h-7 px-3 rounded-lg bg-gray-100 text-gray-500 text-[11px] font-semibold flex items-center">数据分析</Link>
+              </div>
+            )}
+          </div>
         </div>
-        <Link href="/analysis" className="text-xs font-semibold text-emerald-600 whitespace-nowrap">详情</Link>
       </div>
 
       {/* Stats Row — cards with left accent border */}
       <div className="grid grid-cols-3 gap-3">
         {[
           { label: '体重', value: d.weight ?? '--', unit: 'kg', target: changeText(d.weight, d.yesterdayWeight, 'kg'), compareClass: changeTone(d.weight, d.yesterdayWeight, true), border: 'border-l-emerald-400', text: 'text-emerald-600', href: '/weight/add', trend: d.weightTrend3 },
-          { label: '饮水', value: d.water || '今日未记录', unit: d.water ? 'ml' : '', target: d.water ? `${changeText(d.water, d.yesterdayWater, 'ml')} · 目标 ${d.waterTarget}ml` : `目标 ${d.waterTarget}ml`, compareClass: changeTone(d.water, d.yesterdayWater), action: d.water ? '+添加' : '立即添加', onClick: () => openQuick('water'), border: 'border-l-blue-300', text: 'text-blue-500' },
-          { label: '步数', value: d.steps || '今日未记录', unit: d.steps ? '步' : '', target: d.steps ? `${changeText(d.steps, d.yesterdaySteps, '步')} · 目标 ${d.stepsTarget}步` : `目标 ${d.stepsTarget}步`, compareClass: changeTone(d.steps, d.yesterdaySteps), action: d.steps ? '+录入' : '立即录入', onClick: () => openQuick('steps'), border: 'border-l-amber-400', text: 'text-amber-500' },
+          { label: '饮水', value: d.water || '还没记录', unit: d.water ? 'ml' : '', target: d.water ? `${changeText(d.water, d.yesterdayWater, 'ml')} · 目标 ${d.waterTarget}ml` : `点击快速记录 · 目标 ${d.waterTarget}ml`, compareClass: changeTone(d.water, d.yesterdayWater), action: d.water ? '+添加' : '💧 马上记一口', onClick: () => openQuick('water'), border: 'border-l-blue-300', text: 'text-blue-500' },
+          { label: '步数', value: d.steps || '还没记录', unit: d.steps ? '步' : '', target: d.steps ? `${changeText(d.steps, d.yesterdaySteps, '步')} · 目标 ${d.stepsTarget}步` : `点击快速录入 · 目标 ${d.stepsTarget}步`, compareClass: changeTone(d.steps, d.yesterdaySteps), action: d.steps ? '+录入' : '👟 现在录入', onClick: () => openQuick('steps'), border: 'border-l-amber-400', text: 'text-amber-500' },
         ].map((s) => (
           <div key={s.label} className={`bg-white rounded-xl p-3 shadow-sm border-l-4 ${s.border} hover:-translate-y-0.5 transition-transform`}>
             <div className="flex items-start justify-between gap-2">
@@ -355,13 +519,14 @@ export default function Home() {
               查看全部 →
             </Link>
           </div>
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             {d.recentDiet.map((r) => (
-              <div key={r.id} className="flex justify-between items-center text-sm py-1 border-b border-gray-50 last:border-0">
-                <span className="text-gray-500">
-                  {MEAL_LABEL[r.meal] || r.meal} · {r.name}
+              <div key={r.id} className="flex items-center gap-2 py-1.5 border-b border-gray-50 last:border-0">
+                <span className="shrink-0 text-[10px] font-medium text-gray-300 bg-gray-50 px-1.5 py-0.5 rounded">
+                  {MEAL_LABEL[r.meal] || r.meal}
                 </span>
-                <span className="text-emerald-500 font-semibold">{r.calories} kcal</span>
+                <span className="flex-1 min-w-0 text-sm text-gray-600 truncate">{r.name}</span>
+                <span className="shrink-0 text-xs font-semibold text-emerald-500">{r.calories} kcal</span>
               </div>
             ))}
           </div>
@@ -393,10 +558,25 @@ export default function Home() {
               <button onClick={() => setQuick(null)} className="text-gray-400">✕</button>
             </div>
             {quick.type === 'water' && <div className="grid grid-cols-3 gap-2">{[200, 300, 500].map((v) => <button key={v} onClick={() => setQuick((q) => ({ ...q, value: v }))} className={`py-3 rounded-2xl text-sm font-semibold ${Number(quick.value) === v ? 'bg-blue-400 text-white' : 'bg-blue-50 text-blue-500'}`}>{v}ml</button>)}</div>}
+            {quick.type === 'steps' && (
+              <div className="grid grid-cols-3 gap-2">
+                {[5000, 8000, 10000].map((v) => (
+                  <button key={v} onClick={() => setQuick((q) => ({ ...q, value: v }))} className={`py-3 rounded-2xl text-sm font-semibold ${Number(quick.value) === v ? 'bg-amber-400 text-white' : 'bg-amber-50 text-amber-600'}`}>{v}步</button>
+                ))}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">{quick.type === 'water' ? '饮水量 ml' : '步数'}</label>
-                <input type="number" value={quick.value} onChange={(e) => setQuick((q) => ({ ...q, value: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm outline-none focus:border-emerald-400" />
+                <div className="flex items-center gap-1">
+                  {quick.type === 'steps' && (
+                    <button type="button" onClick={() => setQuick((q) => ({ ...q, value: Math.max(0, (Number(q.value) || 0) - 100) }))} className="w-9 h-11 rounded-xl bg-gray-100 text-gray-500 active:scale-95 transition-transform">−</button>
+                  )}
+                  <input type="number" value={quick.value} onChange={(e) => setQuick((q) => ({ ...q, value: e.target.value }))} className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm outline-none focus:border-emerald-400" />
+                  {quick.type === 'steps' && (
+                    <button type="button" onClick={() => setQuick((q) => ({ ...q, value: Math.min(50000, (Number(q.value) || 0) + 100) }))} className="w-9 h-11 rounded-xl bg-gray-100 text-gray-500 active:scale-95 transition-transform">+</button>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">时间</label>

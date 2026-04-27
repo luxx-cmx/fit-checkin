@@ -2,7 +2,8 @@
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/AppDialog'
-import { getHealthRecords, addHealthRecord, deleteHealthRecord, todayStr } from '@/lib/store'
+import { SkeletonCard } from '@/components/Skeleton'
+import { getHealthRecords, addHealthRecord, deleteHealthRecord, todayStr, getProfile, getTodayCalories, getLatestWeight, trackEvent } from '@/lib/store'
 
 const TYPES = [
   { id: 'water', label: '饮水量', unit: 'ml', emoji: '💧', placeholder: '如：2000', color: 'text-blue-500', bg: 'bg-blue-50' },
@@ -19,6 +20,43 @@ export default function HealthPage() {
   const [form, setForm] = useState({ value: '', date: todayStr(), note: '' })
   const [showForm, setShowForm] = useState(false)
   const [deleteId, setDeleteId] = useState(null)
+  const [aiAnalysis, setAiAnalysis] = useState({ loading: false, text: '', costMs: null })
+
+  const handleAiAnalysis = async (mode = 'normal') => {
+    if (aiAnalysis.loading) return
+    setAiAnalysis((s) => ({ ...s, loading: true, text: '' }))
+    try {
+      const profile = getProfile()
+      const health = getHealthRecords().filter((r) => r.date === todayStr())
+      const water = health.filter((h) => h.type === 'water').reduce((s, h) => s + (Number(h.value) || 0), 0)
+      const steps = health.filter((h) => h.type === 'steps').reduce((s, h) => s + (Number(h.value) || 0), 0)
+      const res = await fetch('/api/v1/ai/analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          calories: getTodayCalories(),
+          target: Number(profile.dailyCalories) || 1800,
+          water: water || null,
+          waterTarget: Number(profile.dailyWater) || 2000,
+          steps: steps || null,
+          stepsTarget: Number(profile.dailySteps) || 8000,
+          weight: getLatestWeight(),
+          mode,
+        }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setAiAnalysis({ loading: false, text: data.text, costMs: data.costMs })
+        trackEvent('ai_health_analysis_health_page', { mode, costMs: data.costMs })
+      } else {
+        setAiAnalysis({ loading: false, text: '', costMs: null })
+        toast.error(data.msg || 'AI 分析失败')
+      }
+    } catch (e) {
+      setAiAnalysis({ loading: false, text: '', costMs: null })
+      toast.error('AI 分析失败，请稍后重试')
+    }
+  }
 
   const load = () => setRecords(getHealthRecords())
   useEffect(() => { void load() }, [])
@@ -76,6 +114,38 @@ export default function HealthPage() {
           </div>
         </div>
       )}
+
+      {/* AI 健康分析入口 */}
+      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl p-4 border border-emerald-100 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🤖</span>
+            <p className="text-sm font-semibold text-gray-700">AI 健康分析</p>
+          </div>
+          <span className="text-[10px] text-gray-400">基于今日数据，需手动触发</span>
+        </div>
+        {aiAnalysis.loading && !aiAnalysis.text && (
+          <div className="mb-3"><SkeletonCard /></div>
+        )}
+        {aiAnalysis.text && (
+          <div className="mb-3 bg-white/80 rounded-xl p-3 border border-emerald-100">
+            <p className="text-xs text-gray-600 leading-5">{aiAnalysis.text}</p>
+            {aiAnalysis.costMs && <p className="text-[10px] text-gray-300 mt-1">分析耗时 {(aiAnalysis.costMs/1000).toFixed(1)}s</p>}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleAiAnalysis('normal')}
+            disabled={aiAnalysis.loading}
+            className="flex-1 h-9 rounded-xl bg-emerald-400 text-white text-xs font-semibold disabled:opacity-60 active:scale-95 transition-transform"
+          >{aiAnalysis.loading ? '分析中...' : '✨ 今日健康小结'}</button>
+          <button
+            onClick={() => handleAiAnalysis('deep')}
+            disabled={aiAnalysis.loading}
+            className="flex-1 h-9 rounded-xl bg-teal-500 text-white text-xs font-semibold disabled:opacity-60 active:scale-95 transition-transform"
+          >{aiAnalysis.loading ? '...' : '🔍 深度建议'}</button>
+        </div>
+      </div>
 
       {/* Type selector */}
       <div className="grid grid-cols-3 gap-2">
