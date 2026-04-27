@@ -60,6 +60,7 @@ export default function AuthGuard({ children }) {
     let alive = true
     if (pathname === '/login') { setReady(true); return }
     cleanupExpiredCache(30)
+    setReady(false)
     const token = getToken()
     if (!token) {
       router.replace('/login')

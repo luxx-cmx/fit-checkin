@@ -30,10 +30,10 @@ async function autoSync(token, isNew) {
       const favs = getFavorites()
       const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
       if (Object.values(profile).some(Boolean)) {
-        fetch('/api/profile', { method: 'POST', headers, body: JSON.stringify({ data: profile }) }).catch(() => {})
+        fetch('/api/profile', { method: 'POST', headers, body: JSON.stringify({ data: profile }) }).catch(() => { })
       }
       for (const f of favs) {
-        fetch('/api/favorites', { method: 'POST', headers, body: JSON.stringify({ name: f.name, calories: f.calories ?? 0 }) }).catch(() => {})
+        fetch('/api/favorites', { method: 'POST', headers, body: JSON.stringify({ name: f.name, calories: f.calories ?? 0 }) }).catch(() => { })
       }
     } else {
       // 登录：从云端拉取数据覆盖本地
@@ -110,9 +110,8 @@ export default function LoginPage() {
               <button
                 key={key}
                 onClick={() => setTab(key)}
-                className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  tab === key ? 'bg-white text-emerald-500 shadow-sm' : 'text-gray-400'
-                }`}
+                className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${tab === key ? 'bg-white text-emerald-500 shadow-sm' : 'text-gray-400'
+                  }`}
               >
                 {label}
               </button>
@@ -196,7 +195,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-gray-400">
-          数据仅存储在本服务器，不会共享给第三方
+          切换浏览器或登录超过7天后，需要重新登录
         </p>
       </div>
     </div>
