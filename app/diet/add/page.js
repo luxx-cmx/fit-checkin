@@ -20,17 +20,13 @@ const COMMON_FOODS = [
     { name: '西兰花', calories: 34 },
 ]
 
-const AI_PRESETS = [
-    { keys: ['米饭', 'rice', '盖饭'], name: '米饭+家常菜', calories: 520 },
-    { keys: ['鸡胸', 'chicken', '沙拉', 'salad'], name: '鸡胸肉沙拉', calories: 320 },
-    { keys: ['面', 'noodle', 'ramen'], name: '汤面/拌面', calories: 460 },
-    { keys: ['汉堡', 'burger'], name: '汉堡套餐', calories: 680 },
-    { keys: ['水果', 'fruit', 'apple'], name: '水果拼盘', calories: 180 },
-]
-
-function guessFoodFromFile(file) {
-    const fileName = (file?.name || '').toLowerCase()
-    return AI_PRESETS.find((item) => item.keys.some((key) => fileName.includes(key))) || { name: '家常餐食', calories: 450 }
+function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = () => reject(new Error('图片读取失败'))
+        reader.readAsDataURL(file)
+    })
 }
 
 export default function AddDietPage() {
@@ -105,21 +101,33 @@ export default function AddDietPage() {
         trackEvent('ai_meal_upload', { size: file.size })
     }
 
-    const handleAiRecognize = () => {
+    const handleAiRecognize = async () => {
         if (!ai.file) return toast.error('请先上传餐食图片')
         setAi((state) => ({ ...state, loading: true }))
-        window.setTimeout(() => {
-            const result = guessFoodFromFile(ai.file)
+        try {
+            const imageDataUrl = await fileToDataUrl(ai.file)
+            const res = await fetch('/api/ai/vision', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageDataUrl }),
+            })
+            const data = await res.json().catch(() => ({}))
+            if (!res.ok || !data.ok) throw new Error(data.msg || 'AI 识别失败')
+            const result = data.result || {}
             setForm((current) => ({
                 ...current,
-                name: result.name,
-                calories: String(result.calories),
-                note: 'AI识别初稿，可按实际分量和烹饪方式调整',
+                name: result.name || '餐食识别结果',
+                calories: String(result.calories || 450),
+                note: result.note ? `AI识别：${result.note}` : 'AI识别初稿，可按实际分量和烹饪方式调整',
             }))
             setAi((state) => ({ ...state, loading: false }))
-            trackEvent('ai_meal_recognize_mock', { name: result.name, calories: result.calories })
+            trackEvent('ai_meal_recognize', { name: result.name, calories: result.calories, confidence: result.confidence })
             toast.success('已生成识别建议，请确认后保存')
-        }, 600)
+        } catch (e) {
+            setAi((state) => ({ ...state, loading: false }))
+            trackEvent('ai_meal_recognize_failed', { message: e.message })
+            toast.error(e.message || 'AI 识别失败，请稍后重试')
+        }
     }
 
     const foodsHref = `/foods?returnTo=/diet/add&meal=${encodeURIComponent(form.meal)}&date=${encodeURIComponent(form.date)}`
@@ -176,7 +184,7 @@ export default function AddDietPage() {
                                 </label>
                                 <button onClick={handleAiRecognize} disabled={ai.loading} className="h-11 rounded-lg bg-purple-400 text-white text-sm font-semibold disabled:opacity-60">{ai.loading ? '识别中...' : '生成建议'}</button>
                             </div>
-                            <p className="text-xs text-purple-500 leading-5">当前为网站端基础识别体验：优先根据图片信息给出可编辑建议，保存前仍可修改名称、热量和备注。</p>
+                            <p className="text-xs text-purple-500 leading-5">已接入豆包视觉模型：会根据餐食图片给出可编辑的名称与热量建议，保存前仍可修改。</p>
                         </div>
                     )}
                     <input
