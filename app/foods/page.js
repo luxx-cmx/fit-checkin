@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { FOOD_CATEGORIES } from '@/lib/foods'
 import { matchFood } from '@/lib/foodSearch'
-import { getFavorites, getRecentFoods, isFavorite, toggleFavorite, trackEvent } from '@/lib/store'
+import { clearSearchHistory, getCommonPortions, getFavorites, getRecentFoods, getSearchHistory, isFavorite, recordSearchHistory, saveCommonPortion, toggleFavorite, trackEvent } from '@/lib/store'
 
 const FILTERS = ['收藏', '最近', ...FOOD_CATEGORIES]
 
@@ -27,11 +27,15 @@ export default function FoodsPage() {
     const [selectedFood, setSelectedFood] = useState(null)
     const [portion, setPortion] = useState(100)
     const [customCalories, setCustomCalories] = useState('')
+    const [searchHistory, setSearchHistory] = useState([])
+    const [commonPortions, setCommonPortions] = useState([])
 
     const returnTo = searchParams.get('returnTo') || '/diet/add'
 
     useEffect(() => {
         setFavorites(getFavorites())
+        setSearchHistory(getSearchHistory())
+        setCommonPortions(getCommonPortions())
         fetch('/api/foods')
             .then((response) => response.json())
             .then((data) => {
@@ -62,6 +66,7 @@ export default function FoodsPage() {
     }
 
     const handleSelect = (food) => {
+        if (search.trim()) setSearchHistory(recordSearchHistory(search.trim()))
         setSelectedFood(food)
         setPortion(100)
         setCustomCalories('')
@@ -75,6 +80,7 @@ export default function FoodsPage() {
         const calories = customCalories ? Number(customCalories) : computed
         if (!calories || calories <= 0 || calories > 5000) return toast.error('请输入合理热量')
         toast.success(`已选择 ${selectedFood.name} · ${calories}kcal`)
+        setCommonPortions(saveCommonPortion(grams))
         trackEvent('food_select_confirm', { name: selectedFood.name, grams, calories })
         router.push(buildSelectUrl(selectedFood, calories, grams))
     }
@@ -90,11 +96,11 @@ export default function FoodsPage() {
     const adjustedCalories = selectedFood ? Math.round((Number(selectedFood.calories || 0) * Number(portion || 100)) / 100) : 0
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="syj-page md:p-6 space-y-4">
             <div className="flex items-center justify-between pt-3">
                 <button
                     onClick={() => router.push(returnTo)}
-                    className="w-10 h-10 rounded-2xl bg-white shadow-sm text-gray-500 active:scale-95 transition-transform"
+                    className="syj-icon-button w-10 h-10 bg-white/85 shadow-sm text-gray-500"
                 >
                     ←
                 </button>
@@ -105,30 +111,50 @@ export default function FoodsPage() {
                 <div className="w-10" />
             </div>
 
-            <div className="bg-white rounded-3xl p-4 shadow-md shadow-gray-100 space-y-3">
+            <div className="syj-card-solid p-4 space-y-3">
                 <div className="relative">
                     <span className="absolute left-3 top-2.5 text-gray-400">🔍</span>
                     <input
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
                         placeholder={`搜索 ${allFoods.length || 200}+ 食物...`}
-                        className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-emerald-400"
+                        className="w-full pl-9 pr-10 py-3 border border-gray-200 rounded-2xl bg-gray-50 text-sm outline-none focus:border-emerald-400"
                     />
+                    {search && <button onClick={() => setSearch('')} className="absolute right-3 top-2.5 text-gray-300">✕</button>}
                 </div>
 
-                {!search.trim() && (
+                {search.trim() && foodList.length > 0 && (
                     <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-                        {FILTERS.map((item) => (
-                            <button
-                                key={item}
-                                onClick={() => setFilter(item)}
-                                className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${filter === item ? 'bg-emerald-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
-                            >
-                                {item === '收藏' ? '⭐ 收藏' : item === '最近' ? '🕐 最近' : item}
+                        {foodList.slice(0, 8).map((food) => (
+                            <button key={food.name} onClick={() => setSearch(food.name)} className="whitespace-nowrap px-3 py-1.5 rounded-full bg-gray-100 text-xs font-semibold text-gray-500">
+                                {food.name}
                             </button>
                         ))}
                     </div>
+                )}
+
+                {!search.trim() && (
+                    <>
+                        <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+                            {FILTERS.map((item) => (
+                                <button
+                                    key={item}
+                                    onClick={() => setFilter(item)}
+                                    className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${filter === item ? 'bg-emerald-400 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                >
+                                    {item === '收藏' ? '⭐ 收藏' : item === '最近' ? '🕐 最近' : item}
+                                </button>
+                            ))}
+                        </div>
+                        {searchHistory.length > 0 && (
+                            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                                <span className="shrink-0 text-[11px] text-gray-400">历史</span>
+                                {searchHistory.map((item) => <button key={item} onClick={() => setSearch(item)} className="shrink-0 rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-gray-500 shadow-sm">{item}</button>)}
+                                <button onClick={() => { clearSearchHistory(); setSearchHistory([]) }} className="shrink-0 text-[11px] text-gray-300">清除</button>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 
@@ -140,13 +166,13 @@ export default function FoodsPage() {
                             <button
                                 key={`${food.name}-${index}`}
                                 onClick={() => handleSelect(food)}
-                                className="bg-white rounded-3xl p-4 text-left shadow-md shadow-gray-100 border border-gray-100 hover:-translate-y-0.5 hover:shadow-lg transition-all"
+                                className="syj-card-solid p-4 text-left hover:-translate-y-0.5 hover:shadow-lg transition-all"
                             >
                                 <div className="flex items-start justify-between gap-2">
                                     <div>
                                         <p className="text-sm font-semibold text-gray-800 leading-5">{food.name}</p>
                                         {food.category && (
-                                            <span className="inline-flex mt-2 px-2 py-1 rounded-full bg-blue-50 text-[10px] text-blue-500">
+                                            <span className="syj-pill mt-2 px-2 py-1 bg-blue-50 text-[10px] text-blue-500">
                                                 {displayCategory(food)}
                                             </span>
                                         )}
@@ -154,7 +180,7 @@ export default function FoodsPage() {
                                     <button
                                         type="button"
                                         onClick={(event) => handleToggleFavorite(food, event)}
-                                        className={`text-lg leading-none ${favorite ? 'text-amber-400' : 'text-gray-300'}`}
+                                        className={`syj-icon-button w-8 h-8 text-lg leading-none ${favorite ? 'text-amber-400 bg-amber-50' : 'text-gray-300 bg-gray-50'}`}
                                     >
                                         {favorite ? '★' : '☆'}
                                     </button>
@@ -171,7 +197,7 @@ export default function FoodsPage() {
                     })}
                 </div>
             ) : (
-                <div className="bg-white rounded-3xl py-16 text-center text-gray-400 shadow-md shadow-gray-100">
+                <div className="syj-card bg-gradient-to-br from-emerald-50/95 to-sky-50/90 py-16 text-center text-gray-400">
                     <div className="text-5xl mb-3">🥗</div>
                     <p className="text-sm">没有找到匹配的食物</p>
                     <p className="text-xs mt-1 text-gray-300">试试搜索其他关键词或切换分类</p>
@@ -196,26 +222,29 @@ export default function FoodsPage() {
             </div>
 
             {selectedFood && (
-                <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/30 px-4 pb-4">
-                    <div className="w-full max-w-[420px] rounded-3xl bg-white p-5 shadow-2xl space-y-4">
+                <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/30 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                    <div className="w-full max-w-[420px] max-h-[86vh] overflow-y-auto rounded-[2rem] bg-white/95 p-5 shadow-2xl backdrop-blur-xl space-y-4">
                         <div className="flex items-start justify-between gap-3">
                             <div>
                                 <h3 className="text-lg font-bold text-gray-800">{selectedFood.name}</h3>
                                 <p className="text-xs text-gray-400 mt-1">默认 {selectedFood.calories}kcal / 100g · {displayCategory(selectedFood)}</p>
                             </div>
-                            <button onClick={() => setSelectedFood(null)} className="text-gray-400">✕</button>
+                            <button onClick={() => setSelectedFood(null)} className="syj-icon-button w-9 h-9 bg-gray-100 text-gray-400">✕</button>
                         </div>
                         <div>
                             <div className="flex justify-between text-sm mb-2"><span className="text-gray-500">分量</span><span className="font-semibold text-emerald-600">{portion}g</span></div>
                             <input type="range" min="10" max="500" step="10" value={portion} onChange={(e) => setPortion(Number(e.target.value))} className="w-full accent-emerald-400" />
                             <div className="flex justify-between text-[10px] text-gray-300 mt-1"><span>10g</span><span>500g</span></div>
+                            <div className="mt-3 flex gap-2 overflow-x-auto">
+                                {commonPortions.map((grams) => <button key={grams} onClick={() => setPortion(Number(grams))} className="shrink-0 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-600">{grams}g</button>)}
+                            </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
                             <div className="bg-emerald-50 rounded-2xl p-3"><p className="text-xs text-gray-400">自动换算热量</p><p className="text-2xl font-bold text-emerald-600 mt-1">{adjustedCalories}<span className="text-xs text-gray-400 ml-1">kcal</span></p></div>
                             <div><label className="text-xs text-gray-400 mb-1 block">手动修改热量</label><input type="number" value={customCalories} onChange={(e) => setCustomCalories(e.target.value)} placeholder="可选" className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm outline-none focus:border-emerald-400" /></div>
                         </div>
                         <p className="text-xs text-gray-400 leading-5">热量备注：数据按常见食物 100g 估算，不同烹饪方式可手动修正。</p>
-                        <button onClick={confirmSelect} className="w-full py-3 rounded-2xl bg-emerald-400 text-white font-semibold">确认添加到记录</button>
+                        <button onClick={confirmSelect} className="w-full py-3 rounded-full bg-emerald-400 text-white font-semibold">确认添加到记录</button>
                     </div>
                 </div>
             )}

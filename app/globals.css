@@ -2,9 +2,90 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --syj-bg: #f7fbf8;
+  --syj-bg-soft: #eef8f3;
+  --syj-card: rgba(255, 255, 255, 0.92);
+  --syj-card-solid: #ffffff;
+  --syj-border: rgba(148, 163, 184, 0.18);
+  --syj-text: #26352f;
+  --syj-muted: #7b8a84;
+  --syj-primary: #78d8b6;
+  --syj-primary-strong: #18a878;
+  --syj-blue: #8cccf7;
+  --syj-amber: #f4bd63;
+  --syj-lilac: #c8b6ff;
+  --syj-danger: #ef7f7f;
+  --syj-shadow: 0 18px 45px rgba(46, 84, 67, 0.08);
+}
+
+html.dark {
+  --syj-bg: #111827;
+  --syj-bg-soft: #172033;
+  --syj-card: rgba(30, 41, 59, 0.9);
+  --syj-card-solid: #1e293b;
+  --syj-border: rgba(148, 163, 184, 0.22);
+  --syj-text: #e5e7eb;
+  --syj-muted: #9ca3af;
+  --syj-primary: #77d7ba;
+  --syj-primary-strong: #5ee0b2;
+  --syj-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
+}
+
 html,
 body {
-  background: #f9fafb;
+  background:
+    radial-gradient(circle at 15% -10%, rgba(198, 246, 213, 0.68), transparent 34rem),
+    radial-gradient(circle at 92% 8%, rgba(191, 219, 254, 0.5), transparent 28rem),
+    linear-gradient(180deg, var(--syj-bg), var(--syj-bg-soft));
+  color: var(--syj-text);
+  min-height: 100%;
+}
+
+body {
+  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+}
+
+@layer components {
+  .syj-page {
+    width: 100%;
+    padding: 1rem;
+  }
+
+  .syj-card {
+    background: var(--syj-card);
+    border: 1px solid var(--syj-border);
+    border-radius: 1.5rem;
+    box-shadow: var(--syj-shadow);
+    backdrop-filter: blur(18px);
+  }
+
+  .syj-card-solid {
+    background: var(--syj-card-solid);
+    border: 1px solid var(--syj-border);
+    border-radius: 1.5rem;
+    box-shadow: 0 12px 30px rgba(46, 84, 67, 0.06);
+  }
+
+  .syj-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    font-weight: 700;
+  }
+
+  .syj-icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 1rem;
+    transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .syj-icon-button:active {
+    transform: scale(0.95);
+  }
 }
 
 html[data-syj-font-size='small'] {
@@ -109,12 +190,24 @@ textarea:focus-visible {
 
 /* 首页核心入口编辑态抖动 */
 @keyframes wiggle {
-  0%, 100% { transform: rotate(-1.2deg); }
-  50% { transform: rotate(1.2deg); }
+
+  0%,
+  100% {
+    transform: rotate(-1.2deg);
+  }
+
+  50% {
+    transform: rotate(1.2deg);
+  }
 }
 
 /* 骨架屏微光扫过 */
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }

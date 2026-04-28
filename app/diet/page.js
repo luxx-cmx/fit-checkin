@@ -21,6 +21,7 @@ const MEALS = [
 export default function DietPage() {
   const [records, setRecords] = useState([])
   const [selectedDate, setSelectedDate] = useState(todayStr())
+  const [activeMeal, setActiveMeal] = useState('all')
   const [deleteId, setDeleteId] = useState(null)
   const [showFull, setShowFull] = useState(null)
 
@@ -31,6 +32,7 @@ export default function DietPage() {
 
   const dayRecords = records.filter((r) => r.date === selectedDate)
   const totalCals = dayRecords.reduce((s, r) => s + (Number(r.calories) || 0), 0)
+  const visibleMeals = activeMeal === 'all' ? MEALS : MEALS.filter((meal) => meal.id === activeMeal)
 
   const handleDelete = (id) => {
     deleteDietRecord(id)
@@ -53,83 +55,95 @@ export default function DietPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      {/* Header */}
-      <div className="h-11 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-gray-800">饮食记录</h1>
+    <div className="syj-page md:p-6 space-y-4">
+      <div className="flex items-center justify-between pt-1">
+        <div>
+          <h1 className="text-lg font-bold text-gray-800">饮食记录</h1>
+          <p className="mt-1 text-xs text-gray-400">按餐次回顾今日摄入，保持轻松记录</p>
+        </div>
         <input
           type="date"
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
-          className="h-9 text-sm border border-gray-200 rounded-lg px-2 text-gray-600 outline-none focus:border-emerald-400 bg-white"
+          className="h-10 text-sm border border-white/80 rounded-2xl px-3 text-gray-600 outline-none focus:border-emerald-400 bg-white/85 shadow-sm"
         />
       </div>
 
-      {/* Summary */}
-      <div className="bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-xl p-4 text-white flex justify-between items-center shadow-sm">
+      <div className="syj-card bg-gradient-to-br from-emerald-300 to-teal-400 p-5 text-white flex flex-col min-[380px]:flex-row min-[380px]:justify-between min-[380px]:items-center gap-4">
         <div>
-          <p className="text-emerald-100 text-xs mb-0.5 font-medium">今日摄入</p>
-          <p className="text-3xl font-bold">
+          <p className="text-white/80 text-xs mb-0.5 font-medium">今日摄入</p>
+          <p className="text-4xl font-black tracking-tight">
             {totalCals} <span className="text-base font-normal opacity-80">kcal</span>
           </p>
         </div>
-        <div className="text-right">
-          <p className="text-emerald-100 text-xs">共 {dayRecords.length} 条</p>
-          <p className="text-lg font-semibold mt-0.5">{MEALS.length} 餐次</p>
+        <div className="w-full min-[380px]:w-auto text-left min-[380px]:text-right rounded-3xl bg-white/20 px-4 py-3">
+          <p className="text-white/80 text-xs">共 {dayRecords.length} 条</p>
+          <p className="text-lg font-semibold mt-0.5">{dayRecords.filter((r) => r.calories).length} 项有效</p>
         </div>
       </div>
 
-      {/* Quick actions */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="syj-card p-1.5 bg-white/80 flex gap-1 overflow-x-auto">
+        {[{ id: 'all', label: '全部', emoji: '🍽️' }, ...MEALS].map((meal) => (
+          <button
+            key={meal.id}
+            onClick={() => setActiveMeal(meal.id)}
+            className={`shrink-0 h-11 px-4 rounded-2xl text-sm font-semibold transition-all ${activeMeal === meal.id ? 'bg-emerald-400 text-white shadow-sm' : 'text-gray-500 hover:bg-white/70'}`}
+          >
+            {meal.emoji} {meal.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-2">
         <Link
           href={`/diet/add?date=${encodeURIComponent(selectedDate)}`}
-          className="h-11 flex items-center justify-center gap-1.5 bg-white border border-dashed border-emerald-300 rounded-lg text-emerald-600 font-semibold text-sm active:scale-95 transition-transform"
+          className="h-12 flex items-center justify-center gap-1.5 bg-white/85 border border-dashed border-emerald-300 rounded-3xl text-emerald-600 font-semibold text-sm active:scale-95 transition-transform shadow-sm"
         >
           + 添加饮食
         </Link>
         <Link
           href={`/foods?returnTo=/diet/add&date=${encodeURIComponent(selectedDate)}`}
-          className="h-11 flex items-center justify-center gap-1.5 bg-white border border-dashed border-blue-200 rounded-lg text-blue-500 font-semibold text-sm active:scale-95 transition-transform"
+          className="h-12 flex items-center justify-center gap-1.5 bg-white/85 border border-dashed border-blue-200 rounded-3xl text-blue-500 font-semibold text-sm active:scale-95 transition-transform shadow-sm"
         >
           🥗 食物库
         </Link>
         <button
           onClick={handleCopyYesterday}
-          className="h-11 flex items-center justify-center gap-1.5 bg-white border border-dashed border-amber-200 rounded-lg text-amber-500 font-semibold text-sm active:scale-95 transition-transform"
+          className="h-12 flex items-center justify-center gap-1.5 bg-white/85 border border-dashed border-amber-200 rounded-3xl text-amber-500 font-semibold text-sm active:scale-95 transition-transform shadow-sm"
         >
           📋 复用昨日
         </button>
       </div>
 
-      {/* Records grouped by meal */}
-      {MEALS.map((meal) => {
+      {visibleMeals.map((meal) => {
         const items = dayRecords.filter((r) => r.meal === meal.id)
         if (items.length === 0) return null
         const mealCals = items.reduce((s, r) => s + (Number(r.calories) || 0), 0)
         return (
-          <div key={meal.id} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="flex justify-between items-center px-4 py-3 bg-gray-50">
+          <div key={meal.id} className="syj-card-solid overflow-hidden">
+            <div className="flex justify-between items-center px-4 py-3 bg-white/60">
               <span className="font-semibold text-gray-700 text-sm">
                 {meal.emoji} {meal.label}
               </span>
-              <span className="text-sm text-emerald-500 font-semibold">{mealCals} kcal</span>
+              <span className="syj-pill h-7 px-3 bg-emerald-50 text-xs text-emerald-600">{mealCals} kcal</span>
             </div>
             {items.map((r) => (
-              <div key={r.id} className="flex items-center gap-2 px-4 py-3 border-t border-gray-50">
+              <div key={r.id} className="flex items-center gap-3 px-4 py-3 border-t border-gray-50">
                 <button
                   onClick={() => setShowFull({ name: r.name, calories: r.calories })}
                   className="flex-1 min-w-0 text-left active:opacity-60"
                   title={r.name}
                 >
-                  <span className="block text-sm text-gray-700 truncate">{r.name}</span>
+                  <span className="block text-sm font-semibold text-gray-700 truncate">{r.name}</span>
+                  <span className="mt-1 block text-[11px] text-gray-400">点击查看完整名称</span>
                 </button>
                 <span className="text-sm text-emerald-500 font-bold tabular-nums whitespace-nowrap">{r.calories} kcal</span>
                 <Link
                   href={`/diet/add?edit=${encodeURIComponent(r.id)}&date=${encodeURIComponent(selectedDate)}`}
-                  className="text-gray-300 hover:text-emerald-500 text-sm px-1"
+                  className="syj-icon-button w-8 h-8 text-gray-300 hover:text-emerald-500 text-sm"
                   aria-label="编辑"
                 >✎</Link>
-                <button onClick={() => setDeleteId(r.id)} className="text-gray-300 hover:text-red-400 text-base" aria-label="删除">
+                <button onClick={() => setDeleteId(r.id)} className="syj-icon-button w-8 h-8 text-gray-300 hover:text-red-400 text-base" aria-label="删除">
                   🗑
                 </button>
               </div>
@@ -139,7 +153,7 @@ export default function DietPage() {
       })}
 
       {dayRecords.length === 0 && (
-        <div className="text-center py-14 text-gray-400">
+        <div className="syj-card bg-gradient-to-br from-emerald-50/95 to-sky-50/90 text-center py-14 text-gray-400">
           <div className="text-5xl mb-3">🍽️</div>
           <p className="text-sm">暂无饮食记录</p>
           <div className="mt-4 flex items-center justify-center gap-3 text-sm">
@@ -153,16 +167,31 @@ export default function DietPage() {
         </div>
       )}
 
+      {dayRecords.length > 0 && activeMeal !== 'all' && visibleMeals.every((meal) => dayRecords.filter((r) => r.meal === meal.id).length === 0) && (
+        <div className="syj-card-solid py-10 text-center text-gray-400">
+          <div className="text-4xl mb-2">{MEALS.find((meal) => meal.id === activeMeal)?.emoji}</div>
+          <p className="text-sm">这个餐次还没有记录</p>
+          <Link href={`/diet/add?date=${encodeURIComponent(selectedDate)}&meal=${encodeURIComponent(activeMeal)}`} className="mt-3 inline-block text-emerald-500 text-sm font-semibold">去添加</Link>
+        </div>
+      )}
+
+      <Link
+        href={`/diet/add?date=${encodeURIComponent(selectedDate)}${activeMeal !== 'all' ? `&meal=${encodeURIComponent(activeMeal)}` : ''}`}
+        className="md:hidden fixed left-4 right-4 bottom-[calc(5.8rem+env(safe-area-inset-bottom))] z-30 h-12 rounded-full bg-emerald-400 text-white font-semibold shadow-[0_14px_30px_rgba(45,154,117,0.24)] flex items-center justify-center active:scale-95 transition-transform"
+      >
+        + 添加食物
+      </Link>
+
       <ConfirmDialog open={Boolean(deleteId)} title="确认删除这条饮食记录？" message="删除后将无法恢复。" confirmText="删除" danger onConfirm={() => handleDelete(deleteId)} onClose={() => setDeleteId(null)} />
 
       {/* 完整名称查看弹窗 */}
       {showFull && (
-        <div onClick={() => setShowFull(null)} className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-6">
-          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl p-5 max-w-sm w-full shadow-xl">
+        <div onClick={() => setShowFull(null)} className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-3xl p-5 max-w-sm w-full max-h-[82vh] overflow-y-auto shadow-xl">
             <p className="text-xs text-gray-400 mb-2">完整食物名称</p>
             <p className="text-sm text-gray-800 leading-6 break-words">{showFull.name}</p>
             <p className="text-emerald-500 font-bold mt-3">{showFull.calories} kcal</p>
-            <button onClick={() => setShowFull(null)} className="mt-4 w-full h-10 rounded-xl bg-emerald-400 text-white text-sm font-semibold">关闭</button>
+            <button onClick={() => setShowFull(null)} className="mt-4 w-full h-10 rounded-full bg-emerald-400 text-white text-sm font-semibold">关闭</button>
           </div>
         </div>
       )}

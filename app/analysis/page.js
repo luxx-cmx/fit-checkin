@@ -79,6 +79,15 @@ function DualTrend({ trend }) {
     })}<div className="flex gap-4 text-[11px] text-gray-400"><span><i className="inline-block w-2 h-2 rounded-full bg-emerald-400 mr-1" />热量达标率</span><span><i className="inline-block w-2 h-2 rounded-full bg-blue-300 mr-1" />体重趋势</span></div></div>
 }
 
+function AnalysisMetricCard({ label, value, unit, tone = 'text-emerald-600' }) {
+    return (
+        <div className="syj-card-solid p-4">
+            <p className="text-xs font-semibold text-gray-400">{label}</p>
+            <p className={`mt-1 text-2xl font-black tracking-tight ${tone}`}>{value}<span className="text-xs text-gray-400 ml-1">{unit}</span></p>
+        </div>
+    )
+}
+
 export default function AnalysisPage() {
     const [period, setPeriod] = useState(7)
     const [data, setData] = useState(buildLocalSummary(7))
@@ -148,16 +157,30 @@ export default function AnalysisPage() {
     ], [data])
 
     return (
-        <div className="p-4 space-y-4">
+        <div className="syj-page md:p-6 space-y-4">
             <PageHeader title="智能健康分析" subtitle="BMI / BMR / 热量建议 / 体重-热量关联" />
-            <div className="grid grid-cols-3 gap-2">{[7, 14, 30].map((value) => <button key={value} onClick={() => setPeriod(value)} className={`py-3 rounded-2xl text-sm font-semibold ${period === value ? 'bg-emerald-400 text-white' : 'bg-white text-gray-500'}`}>近{value}天</button>)}</div>
-            <div className="grid grid-cols-2 gap-3">{cards.map(([label, value, unit]) => <div key={label} className="bg-white rounded-3xl p-4 shadow-sm"><p className="text-xs text-gray-400">{label}</p><p className="text-2xl font-bold text-emerald-600 mt-1">{value}<span className="text-xs text-gray-400 ml-1">{unit}</span></p></div>)}</div>
-            <div className="bg-white rounded-3xl p-4 shadow-sm"><h3 className="font-semibold text-gray-700 mb-3">智能建议</h3><div className="space-y-2">{data.advice.map((a, i) => <p key={i} className="text-sm text-gray-500 bg-emerald-50 rounded-2xl px-3 py-2">{a}</p>)}</div></div>
-            {/* AI 分析区域 */}
-            <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-3xl p-4 shadow-sm border border-emerald-100">
+
+            <div className="syj-card p-1.5 grid grid-cols-3 gap-1 bg-white/80">
+                {[7, 14, 30].map((value) => (
+                    <button key={value} onClick={() => setPeriod(value)} className={`h-11 rounded-2xl text-sm font-semibold transition-all ${period === value ? 'bg-emerald-400 text-white shadow-sm' : 'text-gray-500 hover:bg-white/70'}`}>近{value}天</button>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+                {cards.map(([label, value, unit], index) => (
+                    <AnalysisMetricCard key={label} label={label} value={value} unit={unit} tone={index === 1 && data.today.calories > data.today.target ? 'text-rose-500' : 'text-emerald-600'} />
+                ))}
+            </div>
+
+            <div className="syj-card-solid p-4">
+                <h3 className="font-semibold text-gray-700 mb-3">智能建议</h3>
+                <div className="space-y-2">{data.advice.map((a, i) => <p key={i} className="text-sm text-gray-500 bg-emerald-50/80 rounded-2xl px-3 py-2 leading-6">{a}</p>)}</div>
+            </div>
+
+            <div className="syj-card bg-gradient-to-r from-emerald-50/95 to-blue-50/90 p-4">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                        <span className="text-xl">🤖</span>
+                        <span className="w-10 h-10 rounded-3xl bg-white/85 flex items-center justify-center text-xl shadow-sm">🤖</span>
                         <h3 className="font-semibold text-gray-700">AI 深度分析</h3>
                     </div>
                     <span className="text-[10px] text-gray-400">基于近{period}天全量数据</span>
@@ -166,7 +189,7 @@ export default function AnalysisPage() {
                     <div className="mb-3"><SkeletonCard /></div>
                 )}
                 {aiAnalysis.text && (
-                    <div className="mb-3 bg-white/80 rounded-2xl p-4 border border-emerald-100">
+                    <div className="mb-3 bg-white/80 rounded-3xl p-4 border border-emerald-100">
                         <p className="text-sm text-gray-600 leading-6">{aiAnalysis.text}</p>
                         {aiAnalysis.costMs && <p className="text-[10px] text-gray-300 mt-2">分析耗时 {(aiAnalysis.costMs / 1000).toFixed(1)}s</p>}
                     </div>
@@ -175,16 +198,21 @@ export default function AnalysisPage() {
                     <button
                         onClick={() => handleAiAnalysis('normal')}
                         disabled={aiAnalysis.loading}
-                        className="flex-1 h-10 rounded-2xl bg-emerald-400 text-white text-sm font-semibold disabled:opacity-60 active:scale-95 transition-transform"
+                        className="flex-1 h-10 rounded-full bg-emerald-400 text-white text-sm font-semibold disabled:opacity-60 active:scale-95 transition-transform"
                     >{aiAnalysis.loading ? 'AI 分析中...' : `✨ AI 近${period}天小结`}</button>
                     <button
                         onClick={() => handleAiAnalysis('deep')}
                         disabled={aiAnalysis.loading}
-                        className="flex-1 h-10 rounded-2xl bg-blue-500 text-white text-sm font-semibold disabled:opacity-60 active:scale-95 transition-transform"
+                        className="flex-1 h-10 rounded-full bg-blue-500 text-white text-sm font-semibold disabled:opacity-60 active:scale-95 transition-transform"
                     >{aiAnalysis.loading ? '...' : '🔍 AI 深度建议'}</button>
                 </div>
             </div>
-            <div className="bg-white rounded-3xl p-4 shadow-sm"><div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-gray-700">体重-热量关联分析</h3><span className="text-xs text-gray-400">近{period}天</span></div><DualTrend trend={data.correlation.trend} /><p className="text-sm text-gray-500 bg-blue-50 rounded-2xl px-3 py-2 mt-3 leading-6">{data.correlation.relationText}</p></div>
+
+            <div className="syj-card-solid p-4">
+                <div className="flex items-center justify-between mb-3"><h3 className="font-semibold text-gray-700">体重-热量关联分析</h3><span className="text-xs text-gray-400">近{period}天</span></div>
+                <DualTrend trend={data.correlation.trend} />
+                <p className="text-sm text-gray-500 bg-blue-50/80 rounded-2xl px-3 py-2 mt-3 leading-6">{data.correlation.relationText}</p>
+            </div>
         </div>
     )
 }

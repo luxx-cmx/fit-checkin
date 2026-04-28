@@ -52,33 +52,34 @@ function MiniLineChart({ data, color = '#16a34a', height = 70 }) {
   )
 }
 
-function CalorieRing({ consumed, target }) {
-  const pct = Math.min(consumed / (target || 1800), 1)
+function CalorieRing({ consumed, target, unit = 'kcal', color = '#18a878', danger = true, size = 'w-20 h-20' }) {
+  const rawPct = Number(consumed || 0) / (Number(target) || 1)
+  const pct = Math.min(Math.max(rawPct, 0), 1)
   const r = 38,
     cx = 50,
     cy = 50
   const circ = 2 * Math.PI * r
-  const color = pct > 1 ? '#ef4444' : pct > 0.85 ? '#f59e0b' : '#16a34a'
+  const strokeColor = danger && rawPct > 1 ? '#ef7f7f' : color
   return (
-    <svg viewBox="0 0 100 100" className="w-24 h-24">
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e5e7eb" strokeWidth="10" />
+    <svg viewBox="0 0 100 100" className={size}>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(148,163,184,0.18)" strokeWidth="10" />
       <circle
         cx={cx}
         cy={cy}
         r={r}
         fill="none"
-        stroke={color}
+        stroke={strokeColor}
         strokeWidth="10"
         strokeDasharray={`${pct * circ} ${circ}`}
         strokeLinecap="round"
         transform="rotate(-90 50 50)"
         style={{ transition: 'stroke-dasharray 0.6s ease' }}
       />
-      <text x="50" y="46" textAnchor="middle" fontSize="13" fontWeight="bold" fill={color}>
+      <text x="50" y="46" textAnchor="middle" fontSize="13" fontWeight="bold" fill={strokeColor}>
         {consumed}
       </text>
       <text x="50" y="60" textAnchor="middle" fontSize="9" fill="#9ca3af">
-        /{target}
+        {unit}
       </text>
     </svg>
   )
@@ -319,13 +320,74 @@ export default function Home() {
     return `${dt.getMonth() + 1}月${dt.getDate()}日 ${weeks[dt.getDay()]}`
   }
 
+  const metricCards = [
+    {
+      key: 'calories',
+      title: '今日热量',
+      value: d.calories,
+      unit: 'kcal',
+      caption: d.calories > d.target ? `超出 ${d.calories - d.target} kcal` : `还可搭配 ${d.target - d.calories} kcal`,
+      note: changeText(d.calories, d.yesterdayCalories, 'kcal'),
+      tone: d.calories > d.target ? 'text-rose-500' : 'text-emerald-600',
+      bg: 'from-emerald-50/95 to-white/85',
+      ring: { consumed: d.calories, target: d.target, unit: 'kcal', color: '#18a878' },
+      progress: Math.min(100, Math.round((d.calories / (d.target || 1)) * 100)),
+      href: '/diet',
+    },
+    {
+      key: 'water',
+      title: '今日饮水',
+      value: d.water || '未记录',
+      unit: d.water ? 'ml' : '',
+      caption: d.water ? `目标 ${d.waterTarget} ml` : `目标 ${d.waterTarget} ml，点我记录`,
+      note: d.water ? changeText(d.water, d.yesterdayWater, 'ml') : '缺水时会优先提醒',
+      tone: d.water >= d.waterTarget ? 'text-blue-600' : 'text-sky-500',
+      bg: 'from-sky-50/95 to-white/85',
+      ring: { consumed: d.water, target: d.waterTarget, unit: 'ml', color: '#60a5fa', danger: false },
+      progress: Math.min(100, Math.round((d.water / (d.waterTarget || 1)) * 100)),
+      action: () => openQuick('water'),
+    },
+    {
+      key: 'steps',
+      title: '今日步数',
+      value: d.steps || '未记录',
+      unit: d.steps ? '步' : '',
+      caption: d.steps ? `目标 ${d.stepsTarget} 步` : `目标 ${d.stepsTarget} 步，点我录入`,
+      note: d.steps ? changeText(d.steps, d.yesterdaySteps, '步') : '达标后显示完成状态',
+      tone: d.steps >= d.stepsTarget ? 'text-emerald-600' : 'text-amber-500',
+      bg: 'from-amber-50/95 to-white/85',
+      ring: { consumed: d.steps, target: d.stepsTarget, unit: '步', color: '#f4bd63', danger: false },
+      progress: Math.min(100, Math.round((d.steps / (d.stepsTarget || 1)) * 100)),
+      action: () => openQuick('steps'),
+    },
+    {
+      key: 'weight',
+      title: '当前体重',
+      value: d.weight ?? '未记录',
+      unit: d.weight ? 'kg' : '',
+      caption: d.weight ? '点击查看体重趋势' : '记录后生成趋势图',
+      note: changeText(d.weight, d.yesterdayWeight, 'kg'),
+      tone: changeTone(d.weight, d.yesterdayWeight, true),
+      bg: 'from-violet-50/95 to-white/85',
+      href: d.weight ? '/weight' : '/weight/add',
+      trend: d.weightTrend3,
+    },
+  ]
+
+  const quickActions = [
+    { key: 'foods', href: '/foods', icon: '🥬', label: '食物库', desc: '搜食材' },
+    { key: 'water', icon: '💧', label: '饮水', desc: '快速补记', action: () => openQuick('water') },
+    { key: 'steps', icon: '👟', label: '步数', desc: '补录今天', action: () => openQuick('steps') },
+    { key: 'weight', href: '/weight/add', icon: '⚖️', label: '体重', desc: '马上记录' },
+  ]
+
   return (
-    <div className="p-4 md:p-6 space-y-4 md:space-y-5">
+    <div className="syj-page md:p-6 space-y-4 md:space-y-5">
       {/* 小程序式标题栏 */}
-      <div className="md:hidden -mx-4 -mt-4 h-11 bg-emerald-400 text-white relative flex items-center justify-center shadow-sm">
-        <span className="absolute left-4 text-[11px] text-white/85">{dateStr()}</span>
+      <div className="md:hidden -mx-1 mt-1 h-12 rounded-[1.4rem] bg-gradient-to-r from-emerald-300 via-teal-300 to-sky-300 text-white relative flex items-center justify-center shadow-[0_14px_30px_rgba(45,154,117,0.18)]">
+        <span className="absolute left-4 text-[11px] text-white/90">{dateStr()}</span>
         <h1 className="text-lg font-bold">食愈记</h1>
-        <Link href="/profile/settings" className="absolute right-3 w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center active:scale-95 transition-transform">⚙️</Link>
+        <Link href="/profile/settings" className="absolute right-3 syj-icon-button w-8 h-8 bg-white/20">⚙️</Link>
       </div>
 
       <div className="hidden md:flex h-11 items-center justify-between">
@@ -333,7 +395,7 @@ export default function Home() {
           <h1 className="text-lg font-bold text-gray-800">首页</h1>
           <p className="text-xs text-gray-400 mt-0.5">{greeting()} · 核心功能一键直达</p>
         </div>
-        <Link href="/profile/settings" className="w-9 h-9 rounded-lg bg-white shadow-sm flex items-center justify-center text-gray-500 hover:text-emerald-600">⚙️</Link>
+        <Link href="/profile/settings" className="syj-icon-button w-10 h-10 bg-white/80 shadow-sm text-gray-500 hover:text-emerald-600">⚙️</Link>
       </div>
 
       {/* 核心入口区 — 长按可拖拽排序 */}
@@ -348,12 +410,12 @@ export default function Home() {
           const def = ENTRY_DEFS[key]
           if (!def) return null
           const picked = pickedEntry === key
-          const baseCls = `min-h-[104px] rounded-xl ${def.bg} px-4 py-4 flex flex-col items-center justify-center text-center shadow-sm active:scale-95 md:hover:-translate-y-0.5 transition-transform select-none`
+          const baseCls = `min-h-[112px] rounded-[1.4rem] ${def.bg} px-4 py-4 flex flex-col items-center justify-center text-center shadow-sm border border-white/70 active:scale-95 md:hover:-translate-y-0.5 transition-transform select-none`
           const editCls = editEntries ? ' animate-[wiggle_0.4s_ease-in-out_infinite]' : ''
           const pickedCls = picked ? ' ring-2 ring-emerald-400' : ''
           const inner = (
             <>
-              <span className="w-16 h-16 rounded-xl bg-white flex items-center justify-center text-4xl shadow-sm">{def.icon}</span>
+              <span className="w-16 h-16 rounded-3xl bg-white/85 flex items-center justify-center text-4xl shadow-sm">{def.icon}</span>
               <span className="mt-2 text-sm font-bold text-gray-800">{def.label}</span>
               <span className="mt-0.5 text-xs text-gray-400">{def.sub}</span>
             </>
@@ -391,30 +453,49 @@ export default function Home() {
         </div>
       )}
 
-      {/* Calorie Card */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
-        <CalorieRing consumed={d.calories} target={d.target} />
-        <div className="flex-1">
-          <p className="text-xs text-gray-400 font-medium">今日热量摄入</p>
-          <p className="text-3xl font-bold text-gray-800 mt-0.5">
-            {d.calories} <span className="text-sm font-normal text-gray-400">kcal</span>
-          </p>
-          <div className={`inline-flex items-center gap-1 mt-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${d.calories > d.target
-            ? 'bg-orange-50 text-orange-500'
-            : 'bg-emerald-50 text-emerald-600'
-            }`}>
-            {d.calories > d.target ? `今日略超目标 ${d.calories - d.target} kcal，明天轻一点就好啦~` : `还可搾配 ${d.target - d.calories} kcal`}
-          </div>
-          <p className={`mt-1 text-xs ${changeTone(d.calories, d.yesterdayCalories, false)}`}>{changeText(d.calories, d.yesterdayCalories, 'kcal')}</p>
-          <div className="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-            <div className={`h-full rounded-full ${d.calories > d.target ? 'bg-orange-300' : 'bg-emerald-400'}`} style={{ width: `${Math.min(100, Math.round((d.calories / (d.target || 1)) * 100))}%` }} />
-          </div>
-        </div>
+      {/* Core Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        {metricCards.map((card) => {
+          const content = (
+            <>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-gray-400">{card.title}</p>
+                  <p className="mt-1 text-2xl font-black tracking-tight text-gray-800">
+                    {card.value} <span className="text-xs font-semibold text-gray-400">{card.unit}</span>
+                  </p>
+                  <p className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${card.tone} bg-white/70`}>{card.caption}</p>
+                </div>
+                {card.ring ? (
+                  <CalorieRing {...card.ring} size="w-20 h-20 shrink-0" />
+                ) : card.trend?.length > 1 ? (
+                  <div className="w-20 shrink-0 pt-2"><MiniLineChart data={card.trend} color="#8b5cf6" height={54} /></div>
+                ) : (
+                  <div className="w-16 h-16 shrink-0 rounded-3xl bg-white/75 flex items-center justify-center text-3xl shadow-sm">⚖️</div>
+                )}
+              </div>
+              <div className="mt-3 space-y-2">
+                {card.progress != null && (
+                  <div className="h-2 rounded-full bg-white/70 overflow-hidden">
+                    <div className="h-full rounded-full bg-current transition-all duration-300" style={{ width: `${card.progress}%`, color: card.ring?.color || '#18a878' }} />
+                  </div>
+                )}
+                <p className={`text-[11px] ${card.tone || 'text-gray-400'}`}>{card.note}</p>
+              </div>
+            </>
+          )
+          const className = `syj-card bg-gradient-to-br ${card.bg} p-4 text-left transition-transform active:scale-[0.98] md:hover:-translate-y-0.5`
+          return card.href ? (
+            <Link key={card.key} href={card.href} className={className}>{content}</Link>
+          ) : (
+            <button key={card.key} type="button" onClick={card.action} className={className}>{content}</button>
+          )
+        })}
       </div>
 
-      <div className="bg-gradient-to-r from-emerald-50 to-blue-50 rounded-xl p-4 border border-emerald-100">
+      <div className="syj-card bg-gradient-to-r from-emerald-50/95 to-sky-50/90 p-4">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-xl shadow-sm">🧠</div>
+          <div className="w-11 h-11 rounded-3xl bg-white/85 flex items-center justify-center text-xl shadow-sm">🧠</div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-gray-700">AI 轻建议</p>
@@ -428,8 +509,8 @@ export default function Home() {
               <div className="mt-2"><SkeletonCard /></div>
             )}
             {adviceOpen && aiAdvice.text && (
-              <div className="mt-2 bg-white/80 rounded-lg p-3 border border-emerald-100">
-                <p className="text-[11px] font-semibold text-emerald-700 mb-1">✨ AI 深度分析{aiAdvice.costMs ? <span className="ml-1 font-normal text-gray-400">({(aiAdvice.costMs/1000).toFixed(1)}s)</span> : null}</p>
+              <div className="mt-2 bg-white/80 rounded-2xl p-3 border border-emerald-100">
+                <p className="text-[11px] font-semibold text-emerald-700 mb-1">✨ AI 深度分析{aiAdvice.costMs ? <span className="ml-1 font-normal text-gray-400">({(aiAdvice.costMs / 1000).toFixed(1)}s)</span> : null}</p>
                 <p className="text-xs text-gray-600 leading-5">{aiAdvice.text}</p>
               </div>
             )}
@@ -438,50 +519,45 @@ export default function Home() {
                 <button
                   onClick={() => handleAiAnalysis('normal')}
                   disabled={aiAdvice.loading}
-                  className="h-7 px-3 rounded-lg bg-emerald-400 text-white text-[11px] font-semibold disabled:opacity-60 active:scale-95 transition-transform"
+                  className="h-8 px-3 rounded-full bg-emerald-400 text-white text-[11px] font-semibold disabled:opacity-60 active:scale-95 transition-transform"
                 >{aiAdvice.loading ? 'AI 分析中...' : '✨ AI 今日分析'}</button>
                 <button
                   onClick={() => handleAiAnalysis('deep')}
                   disabled={aiAdvice.loading}
-                  className="h-7 px-3 rounded-lg bg-blue-400 text-white text-[11px] font-semibold disabled:opacity-60 active:scale-95 transition-transform"
+                  className="h-8 px-3 rounded-full bg-blue-400 text-white text-[11px] font-semibold disabled:opacity-60 active:scale-95 transition-transform"
                 >{aiAdvice.loading ? '...' : '🔍 AI 深度建议'}</button>
-                <Link href="/profile/advice" className="h-7 px-3 rounded-lg bg-gray-100 text-gray-500 text-[11px] font-semibold flex items-center">历史记录</Link>
-                <Link href="/analysis" className="h-7 px-3 rounded-lg bg-gray-100 text-gray-500 text-[11px] font-semibold flex items-center">数据分析</Link>
+                <Link href="/profile/advice" className="h-8 px-3 rounded-full bg-white/75 text-gray-500 text-[11px] font-semibold flex items-center">历史记录</Link>
+                <Link href="/analysis" className="h-8 px-3 rounded-full bg-white/75 text-gray-500 text-[11px] font-semibold flex items-center">数据分析</Link>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Stats Row — cards with left accent border */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: '体重', value: d.weight ?? '--', unit: 'kg', target: changeText(d.weight, d.yesterdayWeight, 'kg'), compareClass: changeTone(d.weight, d.yesterdayWeight, true), border: 'border-l-emerald-400', text: 'text-emerald-600', href: '/weight/add', trend: d.weightTrend3 },
-          { label: '饮水', value: d.water || '还没记录', unit: d.water ? 'ml' : '', target: d.water ? `${changeText(d.water, d.yesterdayWater, 'ml')} · 目标 ${d.waterTarget}ml` : `点击快速记录 · 目标 ${d.waterTarget}ml`, compareClass: changeTone(d.water, d.yesterdayWater), action: d.water ? '+添加' : '💧 马上记一口', onClick: () => openQuick('water'), border: 'border-l-blue-300', text: 'text-blue-500' },
-          { label: '步数', value: d.steps || '还没记录', unit: d.steps ? '步' : '', target: d.steps ? `${changeText(d.steps, d.yesterdaySteps, '步')} · 目标 ${d.stepsTarget}步` : `点击快速录入 · 目标 ${d.stepsTarget}步`, compareClass: changeTone(d.steps, d.yesterdaySteps), action: d.steps ? '+录入' : '👟 现在录入', onClick: () => openQuick('steps'), border: 'border-l-amber-400', text: 'text-amber-500' },
-        ].map((s) => (
-          <div key={s.label} className={`bg-white rounded-xl p-3 shadow-sm border-l-4 ${s.border} hover:-translate-y-0.5 transition-transform`}>
-            <div className="flex items-start justify-between gap-2">
-              <div className={`font-bold text-lg ${s.text}`}>{s.value}</div>
-              {s.trend?.length > 1 && <div className="w-16"><MiniLineChart data={s.trend} color="#34d399" height={32} /></div>}
-            </div>
-            <div className="text-[11px] text-gray-400 mt-0.5">{s.label} {s.unit}</div>
-            {s.target && <div className={`text-[10px] mt-0.5 ${s.compareClass || 'text-gray-300'}`}>{s.target}</div>}
-            {s.href && !d.weight && <Link href={s.href} className="mt-2 inline-block text-[11px] font-semibold text-emerald-600">立即录入</Link>}
-            {s.action && <button onClick={s.onClick} className={`mt-2 text-[11px] font-semibold ${s.text}`}>{s.action}</button>}
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-white/70 rounded-xl px-4 py-3 text-[11px] text-gray-400 leading-5">
+      <div className="syj-card-solid px-4 py-3 text-[11px] text-gray-400 leading-5">
         每日饮水建议 1500-2000ml，步数建议 8000 步；手动录入会优先作为今日统计数据。
       </div>
 
-      {/* 轻量辅助入口 */}
-      <div className="grid grid-cols-3 gap-2 text-center text-xs text-gray-400">
-        <Link href="/foods" className="rounded-xl bg-white py-3 shadow-sm active:scale-95 transition-transform">食物库</Link>
-        <Link href="/health/stats" className="rounded-xl bg-white py-3 shadow-sm active:scale-95 transition-transform">统计</Link>
-        <Link href="/profile/feedback" className="rounded-xl bg-white py-3 shadow-sm active:scale-95 transition-transform">反馈</Link>
+      <div className="md:hidden sticky bottom-[5.6rem] z-20">
+        <div className="syj-card mx-1 px-2 py-2 bg-white/88">
+          <div className="grid grid-cols-4 gap-2">
+            {quickActions.map((item) => {
+              const inner = (
+                <>
+                  <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-white/90 text-xl shadow-sm">{item.icon}</span>
+                  <span className="mt-2 block text-[11px] font-semibold text-gray-700">{item.label}</span>
+                  <span className="mt-0.5 block text-[10px] text-gray-400">{item.desc}</span>
+                </>
+              )
+              const className = 'rounded-[1.2rem] px-2 py-2 text-center active:scale-95 transition-transform'
+              return item.href ? (
+                <Link key={item.key} href={item.href} className={className}>{inner}</Link>
+              ) : (
+                <button key={item.key} type="button" onClick={item.action} className={className}>{inner}</button>
+              )
+            })}
+          </div>
+        </div>
       </div>
 
       <div className="hidden md:grid grid-cols-3 gap-3">
@@ -490,7 +566,7 @@ export default function Home() {
           { href: '/reports', title: '报告分享', desc: '生成7天/30天报告卡片' },
           { href: '/social', title: '社区互动', desc: '好友、动态、小组与激励' },
         ].map((item) => (
-          <Link key={item.href} href={item.href} className="rounded-xl bg-white border border-gray-100 px-4 py-3 shadow-sm hover:bg-emerald-50 transition-colors">
+          <Link key={item.href} href={item.href} className="syj-card-solid rounded-[1.4rem] px-4 py-3 hover:bg-emerald-50/60 transition-colors">
             <p className="text-sm font-semibold text-gray-700">{item.title}</p>
             <p className="text-xs text-gray-400 mt-1">{item.desc}</p>
           </Link>
@@ -499,11 +575,14 @@ export default function Home() {
 
       {/* Weight Trend */}
       {d.weightTrend.length > 1 && (
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-semibold text-gray-700 text-sm">近期体重趋势</h3>
-            <Link href="/weight" className="text-xs text-emerald-500 font-medium">
-              查看详情 →
+        <div className="syj-card-solid p-4">
+          <div className="flex justify-between items-center mb-3">
+            <div>
+              <h3 className="font-semibold text-gray-700 text-sm">近期体重趋势</h3>
+              <p className="text-[11px] text-gray-400 mt-1">最近 20 条体重记录自动生成趋势</p>
+            </div>
+            <Link href="/weight" className="syj-pill h-8 px-3 bg-emerald-50 text-xs text-emerald-600 font-semibold">
+              查看详情
             </Link>
           </div>
           <MiniLineChart data={d.weightTrend} color="#34d399" />
@@ -512,17 +591,20 @@ export default function Home() {
 
       {/* Today Diet */}
       {d.recentDiet.length > 0 ? (
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+        <div className="syj-card-solid p-4">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="font-semibold text-gray-700 text-sm">今日饮食</h3>
-            <Link href="/diet" className="text-xs text-emerald-500 font-medium">
-              查看全部 →
+            <div>
+              <h3 className="font-semibold text-gray-700 text-sm">今日饮食</h3>
+              <p className="text-[11px] text-gray-400 mt-1">最近 5 条记录，便于快速回顾今天吃了什么</p>
+            </div>
+            <Link href="/diet" className="syj-pill h-8 px-3 bg-emerald-50 text-xs text-emerald-600 font-semibold">
+              查看全部
             </Link>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {d.recentDiet.map((r) => (
-              <div key={r.id} className="flex items-center gap-2 py-1.5 border-b border-gray-50 last:border-0">
-                <span className="shrink-0 text-[10px] font-medium text-gray-300 bg-gray-50 px-1.5 py-0.5 rounded">
+              <div key={r.id} className="flex items-center gap-3 rounded-2xl bg-gray-50/70 px-3 py-3 last:border-0">
+                <span className="shrink-0 syj-pill h-6 px-2 bg-white text-[10px] font-semibold text-gray-400 shadow-sm">
                   {MEAL_LABEL[r.meal] || r.meal}
                 </span>
                 <span className="flex-1 min-w-0 text-sm text-gray-600 truncate">{r.name}</span>
@@ -532,15 +614,15 @@ export default function Home() {
           </div>
         </div>
       ) : (
-        <div className="bg-gradient-to-br from-emerald-50 to-blue-50 rounded-xl p-6 text-center border border-emerald-100">
-          <div className="w-14 h-14 mx-auto rounded-xl bg-white flex items-center justify-center shadow-sm mb-3">
+        <div className="syj-card bg-gradient-to-br from-emerald-50/95 to-sky-50/90 p-6 text-center">
+          <div className="w-14 h-14 mx-auto rounded-3xl bg-white/85 flex items-center justify-center shadow-sm mb-3">
             <span className="text-3xl">🍽️</span>
           </div>
           <p className="text-gray-600 text-sm font-medium">今日还未记录饮食</p>
           <p className="text-gray-400 text-xs mt-1">记录每餐，掌握热量摄入</p>
           <Link
             href="/diet/add"
-            className="inline-block mt-4 bg-emerald-400 text-white text-sm px-6 py-2.5 rounded-lg font-semibold shadow-sm active:scale-95 transition-transform"
+            className="inline-block mt-4 bg-emerald-400 text-white text-sm px-6 py-2.5 rounded-full font-semibold shadow-sm active:scale-95 transition-transform"
           >
             去记录
           </Link>
@@ -548,14 +630,14 @@ export default function Home() {
       )}
 
       {quick && (
-        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/30 px-4 pb-4">
-          <div className="w-full max-w-[420px] rounded-3xl bg-white p-5 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/30 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <div className="w-full max-w-[420px] max-h-[86vh] overflow-y-auto rounded-[2rem] border border-white/80 bg-white/92 p-5 shadow-2xl backdrop-blur-xl space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-gray-800">{quick.type === 'water' ? '添加饮水' : '录入步数'}</h3>
                 <p className="text-xs text-gray-400 mt-1">{quick.type === 'water' ? '支持 200 / 300 / 500ml 快捷选择' : '请输入今天累计步数'}</p>
               </div>
-              <button onClick={() => setQuick(null)} className="text-gray-400">✕</button>
+              <button onClick={() => setQuick(null)} className="syj-icon-button w-9 h-9 bg-gray-100 text-gray-400">✕</button>
             </div>
             {quick.type === 'water' && <div className="grid grid-cols-3 gap-2">{[200, 300, 500].map((v) => <button key={v} onClick={() => setQuick((q) => ({ ...q, value: v }))} className={`py-3 rounded-2xl text-sm font-semibold ${Number(quick.value) === v ? 'bg-blue-400 text-white' : 'bg-blue-50 text-blue-500'}`}>{v}ml</button>)}</div>}
             {quick.type === 'steps' && (
@@ -565,16 +647,16 @@ export default function Home() {
                 ))}
               </div>
             )}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-gray-400 mb-1 block">{quick.type === 'water' ? '饮水量 ml' : '步数'}</label>
                 <div className="flex items-center gap-1">
                   {quick.type === 'steps' && (
-                    <button type="button" onClick={() => setQuick((q) => ({ ...q, value: Math.max(0, (Number(q.value) || 0) - 100) }))} className="w-9 h-11 rounded-xl bg-gray-100 text-gray-500 active:scale-95 transition-transform">−</button>
+                    <button type="button" onClick={() => setQuick((q) => ({ ...q, value: Math.max(0, (Number(q.value) || 0) - 100) }))} className="w-9 h-11 rounded-2xl bg-gray-100 text-gray-500 active:scale-95 transition-transform">−</button>
                   )}
                   <input type="number" value={quick.value} onChange={(e) => setQuick((q) => ({ ...q, value: e.target.value }))} className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm outline-none focus:border-emerald-400" />
                   {quick.type === 'steps' && (
-                    <button type="button" onClick={() => setQuick((q) => ({ ...q, value: Math.min(50000, (Number(q.value) || 0) + 100) }))} className="w-9 h-11 rounded-xl bg-gray-100 text-gray-500 active:scale-95 transition-transform">+</button>
+                    <button type="button" onClick={() => setQuick((q) => ({ ...q, value: Math.min(50000, (Number(q.value) || 0) + 100) }))} className="w-9 h-11 rounded-2xl bg-gray-100 text-gray-500 active:scale-95 transition-transform">+</button>
                   )}
                 </div>
               </div>
@@ -583,7 +665,7 @@ export default function Home() {
                 <input type="time" value={quick.time} onChange={(e) => setQuick((q) => ({ ...q, time: e.target.value }))} className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm outline-none focus:border-emerald-400" />
               </div>
             </div>
-            <button onClick={confirmQuick} className="w-full py-3 rounded-2xl bg-emerald-400 text-white font-semibold">确认</button>
+            <button onClick={confirmQuick} className="w-full py-3 rounded-full bg-emerald-400 text-white font-semibold">确认</button>
           </div>
         </div>
       )}

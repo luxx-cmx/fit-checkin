@@ -10,8 +10,8 @@ import { getDietRecords, getHealthRecords, getProfile, getSyncStatus, getWeightR
 
 function StatCard({ label, value, unit, accent = 'text-emerald-600', href }) {
     const inner = (
-        <div className="bg-white rounded-xl p-3 shadow-sm border border-gray-100 active:scale-95 transition-transform">
-            <p className={`text-xl font-bold ${accent}`}>
+        <div className="syj-card-solid p-3 active:scale-95 transition-transform">
+            <p className={`text-xl font-black tracking-tight ${accent}`}>
                 {value}
                 <span className="text-xs text-gray-400 ml-1">{unit}</span>
             </p>
@@ -26,9 +26,9 @@ function StatCard({ label, value, unit, accent = 'text-emerald-600', href }) {
 
 function EntryCard({ href, icon, title, desc }) {
     return (
-        <Link href={href} className="block bg-white border-b border-gray-100 last:border-0 active:bg-gray-50 transition-colors">
-            <div className="h-11 px-4 flex items-center gap-3">
-                <span className="w-6 h-6 flex items-center justify-center text-xl text-emerald-600 shrink-0">{icon}</span>
+        <Link href={href} className="block border-b border-gray-100 last:border-0 active:bg-gray-50 transition-colors">
+            <div className="min-h-14 px-4 py-3 flex items-center gap-3">
+                <span className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center text-xl text-emerald-600 shrink-0">{icon}</span>
                 <span className="flex-1 min-w-0">
                     <span className="block text-sm font-semibold text-gray-800">{title}</span>
                     {desc && <span className="block text-[11px] text-gray-400 truncate">{desc}</span>}
@@ -118,33 +118,37 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="p-4 md:p-6 space-y-4">
+        <div className="syj-page md:p-6 space-y-4">
             <div className="h-11 flex items-center justify-center md:justify-start">
                 <h1 className="text-lg font-bold text-gray-800">我的</h1>
             </div>
 
-            <div className="bg-emerald-50 rounded-xl p-4 min-h-[100px] shadow-sm border border-emerald-100">
+            <div className="syj-card bg-gradient-to-br from-emerald-50/95 to-sky-50/90 p-4 min-h-[118px]">
                 <div className="flex items-center gap-4">
-                    <div className="w-[60px] h-[60px] rounded-full bg-white flex items-center justify-center text-4xl overflow-hidden shadow-sm shrink-0">
+                    <div className="w-[64px] h-[64px] rounded-3xl bg-white/85 flex items-center justify-center text-4xl overflow-hidden shadow-sm shrink-0">
                         {profile.avatar ? <img src={profile.avatar} alt="头像" className="w-full h-full object-cover" /> : profile.gender === '女' ? '👩' : '👨'}
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-base font-bold text-gray-800 truncate">{displayName}</p>
                         <p className="text-sm text-gray-500 mt-1 truncate">目标：{goalType} · {profile.targetWeight || '--'}kg</p>
                     </div>
-                    <Link href="/profile/info" className="h-9 px-3 rounded-lg bg-white text-sm font-semibold text-emerald-600 flex items-center shadow-sm">
+                    <Link href="/profile/info" className="syj-pill h-9 px-3 bg-white/85 text-sm font-semibold text-emerald-600 shadow-sm">
                         编辑
                     </Link>
                 </div>
+                <div className="mt-4 h-2 rounded-full bg-white/70 overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-300 to-teal-400" style={{ width: profile.targetWeight ? '66%' : '28%' }} />
+                </div>
+                <p className="mt-2 text-[11px] text-gray-400">减重进度会随体重记录逐步更新</p>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <StatCard label="记录天数" value={stats.recordDays} unit="天" href="/analysis" />
                 <StatCard label="平均热量" value={stats.avgCalorie} unit="kcal" href="/analysis" />
                 <StatCard label="体重变化" value={weightValue} unit="kg" accent={weightAccent} href="/weight" />
             </div>
 
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <div className="syj-card-solid p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <p className="text-sm font-semibold text-gray-800">数据库同步状态</p>
@@ -152,7 +156,7 @@ export default function ProfilePage() {
                     </div>
                     <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${syncBadgeClass}`}>{syncBadgeText}</span>
                 </div>
-                <div className="rounded-xl bg-gray-50 px-3 py-3">
+                <div className="rounded-3xl bg-gray-50 px-3 py-3">
                     <p className="text-sm font-semibold text-gray-700">
                         {syncStatus.pendingCount > 0 ? `还有 ${syncStatus.pendingCount} 条新增记录未推送` : '当前新增记录已推送到数据库'}
                     </p>
@@ -164,14 +168,14 @@ export default function ProfilePage() {
                 <button
                     onClick={handleManualSync}
                     disabled={manualSyncing || syncStatus.syncing || syncStatus.pendingCount === 0}
-                    className="w-full h-10 rounded-lg bg-emerald-400 text-white text-sm font-semibold active:scale-95 transition-transform disabled:bg-gray-200 disabled:text-gray-400 disabled:scale-100"
+                    className="w-full h-10 rounded-full bg-emerald-400 text-white text-sm font-semibold active:scale-95 transition-transform disabled:bg-gray-200 disabled:text-gray-400 disabled:scale-100"
                 >
                     {manualSyncing || syncStatus.syncing ? '补推中...' : syncStatus.pendingCount > 0 ? '手动推送所有待同步记录' : '当前没有待补推记录'}
                 </button>
             </div>
 
             {/* 成就勋章 */}
-            <Link href="/social/games" className="block bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 shadow-sm border border-amber-100 active:scale-95 transition-transform">
+            <Link href="/social/games" className="block syj-card bg-gradient-to-br from-amber-50/95 to-orange-50/90 p-4 active:scale-95 transition-transform">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                         <span className="text-lg">🏆</span>
@@ -186,7 +190,7 @@ export default function ProfilePage() {
                                 key={a.achievement_key}
                                 className={`shrink-0 w-16 flex flex-col items-center text-center ${a.is_unlocked ? '' : 'opacity-40 grayscale'}`}
                             >
-                                <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-2xl mb-1">
+                                <div className="w-12 h-12 rounded-3xl bg-white shadow-sm flex items-center justify-center text-2xl mb-1">
                                     {a.is_unlocked ? '🎖️' : '🔒'}
                                 </div>
                                 <p className="text-[10px] text-gray-500 leading-tight truncate w-full">{a.achievement_name}</p>
@@ -198,7 +202,7 @@ export default function ProfilePage() {
                 )}
             </Link>
 
-            <div className="overflow-hidden rounded-xl bg-white shadow-sm border border-gray-100">
+            <div className="overflow-hidden syj-card-solid">
                 <EntryCard href="/profile/info" icon="👤" title="个人信息编辑" desc="昵称、头像、基础资料" />
                 <EntryCard href="/goals" icon="🎯" title="目标设置" desc="减脂、维持、增肌目标" />
                 <EntryCard href="/profile/settings" icon="🔒" title="隐私与设置" desc="提醒、皮肤、授权、帮助" />

@@ -216,32 +216,35 @@ export default function AddDietPage() {
     const selectedMeal = MEALS.find((meal) => meal.id === form.meal) || MEALS[0]
 
     return (
-        <div className="p-4 md:p-6 space-y-4">
+        <div className="syj-page md:p-6 space-y-4">
             <div className="h-11 flex items-center justify-between">
-                <Link href="/diet" className="w-11 h-11 rounded-lg bg-white shadow-sm flex items-center justify-center text-gray-500 active:scale-95 transition-transform">
+                <Link href="/diet" className="syj-icon-button w-11 h-11 bg-white/85 shadow-sm text-gray-500">
                     ←
                 </Link>
-                <h1 className="text-lg font-bold text-gray-800">饮食记录</h1>
+                <div className="text-center">
+                    <h1 className="text-lg font-bold text-gray-800">添加饮食</h1>
+                    <p className="text-[11px] text-gray-400 mt-0.5">选餐次、录食物、确认保存</p>
+                </div>
                 <button
                     onClick={handleSave}
-                    className="min-w-11 h-11 px-3 rounded-lg bg-emerald-400 text-white text-sm font-semibold shadow-sm active:scale-95 transition-transform"
+                    className="min-w-11 h-11 px-3 rounded-2xl bg-emerald-400 text-white text-sm font-semibold shadow-sm active:scale-95 transition-transform"
                 >
                     保存
                 </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center text-xs text-gray-500">
+            <div className="grid grid-cols-1 min-[380px]:grid-cols-3 gap-2 text-center text-xs text-gray-500">
                 {['选餐次', '录食物', '确认保存'].map((item, index) => (
-                    <div key={item} className="rounded-lg bg-white px-3 py-2 shadow-sm border border-gray-100">
+                    <div key={item} className="rounded-2xl bg-white/85 px-3 py-2 shadow-sm border border-white/70">
                         <span className="font-bold text-emerald-500 mr-1">{index + 1}</span>{item}
                     </div>
                 ))}
             </div>
 
-            <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-4">
+            <div className="syj-card-solid p-4 space-y-4">
                 <div>
                     <label className="text-sm font-medium text-gray-700 mb-2 block">餐次</label>
-                    <button onClick={() => setMealOpen(true)} className="w-full h-11 border-0 border-b border-gray-200 flex items-center justify-between text-sm text-gray-700 focus:border-emerald-400">
+                    <button onClick={() => setMealOpen(true)} className="w-full h-12 rounded-2xl bg-gray-50 px-4 flex items-center justify-between text-sm text-gray-700 focus:border-emerald-400">
                         <span>{selectedMeal.emoji} {selectedMeal.label}</span>
                         <span className="text-gray-300">选择 ›</span>
                     </button>
@@ -252,9 +255,9 @@ export default function AddDietPage() {
                         <label className="text-sm font-medium text-gray-700">食物</label>
                     </div>
                     <div className="flex items-center justify-end gap-2 mb-3">
-                        <button onClick={() => setMode('manual')} className={`w-11 h-11 rounded-lg text-xs font-semibold ${mode === 'manual' ? 'bg-emerald-400 text-white' : 'bg-gray-100 text-gray-500'}`}>手动</button>
-                        <Link href={foodsHref} className="w-11 h-11 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center text-xl">🥗</Link>
-                        <button onClick={() => setMode('ai')} className={`w-11 h-11 rounded-lg text-xl ${mode === 'ai' ? 'bg-purple-400 text-white' : 'bg-purple-50 text-purple-500'}`}>📷</button>
+                        <button onClick={() => setMode('manual')} className={`w-12 h-12 rounded-2xl text-xs font-semibold ${mode === 'manual' ? 'bg-emerald-400 text-white' : 'bg-gray-100 text-gray-500'}`}>手动</button>
+                        <Link href={foodsHref} className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center text-xl">🥗</Link>
+                        <button onClick={() => setMode('ai')} className={`w-12 h-12 rounded-2xl text-xl ${mode === 'ai' ? 'bg-purple-400 text-white' : 'bg-purple-50 text-purple-500'}`}>📷</button>
                     </div>
                     {mode === 'ai' && (
                         <div className="mb-3 rounded-xl border border-dashed border-purple-200 bg-purple-50/60 p-4 space-y-3">
@@ -266,7 +269,7 @@ export default function AddDietPage() {
                                 </label>
                                 <button onClick={handleAiRecognize} disabled={ai.loading} className="h-11 rounded-lg bg-purple-400 text-white text-sm font-semibold disabled:opacity-60">{ai.loading ? '识别中...' : '生成建议'}</button>
                             </div>
-                            <p className="text-xs text-purple-500 leading-5">已接入豆包视觉模型：会根据餐食图片给出可编辑的名称与热量建议，保存前仍可修改。{ai.costMs ? <span className="ml-1 text-gray-400">上次识别耗时 {(ai.costMs/1000).toFixed(1)}s</span> : null}</p>
+                            <p className="text-xs text-purple-500 leading-5">已接入豆包视觉模型：会根据餐食图片给出可编辑的名称与热量建议，保存前仍可修改。{ai.costMs ? <span className="ml-1 text-gray-400">上次识别耗时 {(ai.costMs / 1000).toFixed(1)}s</span> : null}</p>
                             {aiItems.length > 0 && (
                                 <div className="rounded-xl bg-white p-3 space-y-2">
                                     <div className="flex items-center justify-between">
@@ -334,7 +337,7 @@ export default function AddDietPage() {
                         onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
                         onKeyDown={(event) => { if (event.key === 'Enter') handleSave() }}
                         placeholder="请输入食物名称或点击选择"
-                        className="w-full h-11 px-1 bg-white border-0 border-b border-gray-200 text-sm outline-none focus:border-emerald-400"
+                        className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm outline-none focus:border-emerald-400"
                     />
                     {frequentFoods.length > 0 && (
                         <div className="mt-3 rounded-xl bg-emerald-50/70 p-3">
@@ -342,13 +345,13 @@ export default function AddDietPage() {
                                 <p className="text-xs font-semibold text-emerald-700">近7天常用 · 点击即添加</p>
                                 <span className="text-[10px] text-emerald-500">无需二次确认</span>
                             </div>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-1 min-[380px]:grid-cols-3 gap-2">
                                 {frequentFoods.map((food) => (
                                     <button
                                         key={food.name}
                                         onClick={() => handleInstantAdd(food)}
                                         disabled={saving}
-                                        className="min-h-11 rounded-lg bg-white px-2 py-2 text-left active:scale-95 transition-transform disabled:opacity-60"
+                                        className="min-h-11 rounded-2xl bg-white px-2 py-2 text-left active:scale-95 transition-transform disabled:opacity-60"
                                     >
                                         <span className="block text-xs font-semibold text-gray-700 truncate">{food.name}</span>
                                         <span className="text-[10px] text-gray-400">{food.calories}kcal · {food.count}次</span>
@@ -362,7 +365,7 @@ export default function AddDietPage() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3">
                     <div>
                         <label className="text-sm font-medium text-gray-700 mb-2 block">热量 (kcal)</label>
                         <input
@@ -370,7 +373,7 @@ export default function AddDietPage() {
                             value={form.calories}
                             onChange={(event) => setForm((current) => ({ ...current, calories: event.target.value }))}
                             placeholder="如：320"
-                            className="w-full h-11 px-1 bg-white border-0 border-b border-gray-200 text-sm outline-none focus:border-emerald-400"
+                            className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm outline-none focus:border-emerald-400"
                         />
                     </div>
                     <div>
@@ -379,7 +382,7 @@ export default function AddDietPage() {
                             type="date"
                             value={form.date}
                             onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
-                            className="w-full h-11 px-1 bg-white border-0 border-b border-gray-200 text-sm outline-none focus:border-emerald-400"
+                            className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm outline-none focus:border-emerald-400"
                         />
                     </div>
                 </div>
@@ -390,21 +393,21 @@ export default function AddDietPage() {
                         value={form.note}
                         onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))}
                         placeholder="如：午饭外卖、加双份鸡蛋"
-                        className="w-full h-11 px-1 bg-white border-0 border-b border-gray-200 text-sm outline-none focus:border-emerald-400"
+                        className="w-full h-12 px-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm outline-none focus:border-emerald-400"
                     />
                 </div>
             </div>
 
-            <button onClick={handleSave} disabled={saving || !form.name.trim() || !form.calories} className="w-full h-11 rounded-lg bg-emerald-400 text-white text-sm font-bold shadow-sm active:scale-95 transition-transform disabled:bg-gray-200 disabled:text-gray-400 disabled:scale-100">{saving ? '保存中...' : '确认添加'}</button>
+            <button onClick={handleSave} disabled={saving || !form.name.trim() || !form.calories} className="w-full h-12 rounded-full bg-emerald-400 text-white text-sm font-bold shadow-sm active:scale-95 transition-transform disabled:bg-gray-200 disabled:text-gray-400 disabled:scale-100">{saving ? '保存中...' : '确认添加'}</button>
 
             {mealOpen && (
-                <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 px-4 pb-4" onClick={() => setMealOpen(false)}>
-                    <div className="w-full max-w-[420px] rounded-t-2xl rounded-b-xl bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+                <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/40 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" onClick={() => setMealOpen(false)}>
+                    <div className="w-full max-w-[420px] max-h-[84vh] overflow-y-auto rounded-[2rem] bg-white/95 p-5 shadow-2xl backdrop-blur-xl" onClick={(event) => event.stopPropagation()}>
                         <h3 className="text-base font-bold text-gray-800 mb-3">选择餐次</h3>
-                        <div className="grid grid-cols-4 gap-2">
-                            {MEALS.map((meal) => <button key={meal.id} onClick={() => { setForm((current) => ({ ...current, meal: meal.id })); setMealOpen(false) }} className={`h-20 rounded-lg text-sm font-semibold active:scale-95 transition-transform ${form.meal === meal.id ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-50 text-gray-600'}`}><span className="block text-2xl mb-1">{meal.emoji}</span>{meal.label}</button>)}
+                        <div className="grid grid-cols-2 min-[380px]:grid-cols-4 gap-2">
+                            {MEALS.map((meal) => <button key={meal.id} onClick={() => { setForm((current) => ({ ...current, meal: meal.id })); setMealOpen(false) }} className={`h-20 rounded-3xl text-sm font-semibold active:scale-95 transition-transform ${form.meal === meal.id ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-50 text-gray-600'}`}><span className="block text-2xl mb-1">{meal.emoji}</span>{meal.label}</button>)}
                         </div>
-                        <button onClick={() => { setPreferredMeal(form.meal); toast.success('已记住本次餐次'); setMealOpen(false) }} className="mt-4 w-full h-11 rounded-lg bg-emerald-400 text-white text-sm font-semibold active:scale-95 transition-transform">
+                        <button onClick={() => { setPreferredMeal(form.meal); toast.success('已记住本次餐次'); setMealOpen(false) }} className="mt-4 w-full h-11 rounded-full bg-emerald-400 text-white text-sm font-semibold active:scale-95 transition-transform">
                             默认选中本次餐次
                         </button>
                     </div>

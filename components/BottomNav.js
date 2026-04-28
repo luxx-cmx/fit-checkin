@@ -64,17 +64,17 @@ export default function BottomNav() {
 
   return (
     <>
-      <header className="hidden md:block fixed top-0 left-0 right-0 z-50 h-11 bg-white/95 border-b border-gray-100 backdrop-blur shadow-sm">
+      <header className="hidden md:block fixed top-0 left-0 right-0 z-50 h-14 bg-white/80 border-b border-white/70 backdrop-blur-xl shadow-[0_12px_30px_rgba(46,84,67,0.06)]">
         <div className="h-full max-w-[1200px] mx-auto px-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 text-sm font-bold text-gray-800">
-            <span className="w-7 h-7 rounded-lg bg-emerald-400 text-white flex items-center justify-center">🥗</span>
+            <span className="w-8 h-8 rounded-2xl bg-gradient-to-br from-emerald-300 to-teal-400 text-white flex items-center justify-center shadow-sm">🥗</span>
             食愈记
           </Link>
           <nav className="flex items-center gap-1">
             {NAV.map(({ href, icon, label }) => {
               const active = isActive(href)
               return (
-                <Link key={href} href={href} className={`h-9 px-4 rounded-lg flex items-center gap-2 text-sm font-semibold transition-colors ${active ? 'text-emerald-600 bg-emerald-50' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-50'}`}>
+                <Link key={href} href={href} className={`h-10 px-4 rounded-2xl flex items-center gap-2 text-sm font-semibold transition-all ${active ? 'text-emerald-700 bg-emerald-50 shadow-sm' : 'text-gray-400 hover:text-gray-700 hover:bg-white/70'}`}>
                   {icon}
                   {label}
                 </Link>
@@ -82,27 +82,27 @@ export default function BottomNav() {
             })}
           </nav>
           <div className="flex items-center gap-2">
-            <Link href="/profile/settings" aria-label="设置" className="w-9 h-9 rounded-lg bg-gray-50 text-gray-500 hover:text-emerald-600 flex items-center justify-center transition-colors">⚙️</Link>
-            <button onClick={logout} aria-label="退出登录" className="w-9 h-9 rounded-lg bg-gray-50 text-gray-500 hover:text-red-500 transition-colors">↩</button>
+            <Link href="/profile/settings" aria-label="设置" className="syj-icon-button w-10 h-10 bg-white/70 text-gray-500 hover:text-emerald-600">⚙️</Link>
+            <button onClick={logout} aria-label="退出登录" className="syj-icon-button w-10 h-10 bg-white/70 text-gray-500 hover:text-red-500">↩</button>
           </div>
         </div>
       </header>
 
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 max-w-md mx-auto h-[50px] bg-white border-t border-gray-100 flex z-50 shadow-[0_-1px_12px_rgba(0,0,0,0.06)]">
+      <nav className="md:hidden fixed left-3 right-3 bottom-3 z-50 mx-auto max-w-md rounded-[1.7rem] border border-white/80 bg-white/88 backdrop-blur-xl shadow-[0_18px_45px_rgba(46,84,67,0.14)] flex px-1.5 py-1.5 pb-[calc(0.375rem+env(safe-area-inset-bottom))]">
         {NAV.map(({ href, icon, label }) => {
           const active = isActive(href)
           return (
             <Link
               key={href}
               href={href}
-              className={`relative flex-1 min-h-[50px] flex flex-col items-center justify-center gap-0.5 text-[12px] font-medium transition-all duration-200 ${active ? 'text-emerald-500' : 'text-gray-400 hover:text-gray-600'
+              className={`relative flex-1 min-h-[56px] rounded-3xl flex flex-col items-center justify-center gap-0.5 text-[12px] font-medium transition-all duration-200 ${active ? 'text-emerald-700 bg-emerald-50' : 'text-gray-400 hover:text-gray-600'
                 }`}
             >
               <span className={`transition-transform duration-200 ${active ? 'scale-110' : ''}`}>
                 {icon}
               </span>
               <span className={active ? 'font-semibold' : ''}>{label}</span>
-              {active && <span className="absolute bottom-0 w-8 h-0.5 bg-emerald-400 rounded-full" />}
+              {active && <span className="absolute top-1.5 w-1.5 h-1.5 bg-emerald-400 rounded-full" />}
             </Link>
           )
         })}
