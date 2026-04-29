@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/AppDialog'
+import { EmptyState } from '@/components/EmptyState'
 import { getChartTags, getWeightRecords, deleteWeightRecord, getProfile, toggleChartTag } from '@/lib/store'
 
 function WeightChart({ data, targetWeight, selectedIndex, onSelect, height = 180 }) {
@@ -31,8 +32,8 @@ function WeightChart({ data, targetWeight, selectedIndex, onSelect, height = 180
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" height={height} role="img" aria-label="体重趋势图">
       <defs>
         <linearGradient id="wgrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#78d8b6" stopOpacity="0.24" />
-          <stop offset="100%" stopColor="#78d8b6" stopOpacity="0" />
+          <stop offset="0%" stopColor="var(--syj-primary)" stopOpacity="0.24" />
+          <stop offset="100%" stopColor="var(--syj-primary)" stopOpacity="0" />
         </linearGradient>
       </defs>
       {[0.25, 0.5, 0.75].map((p) => (
@@ -45,10 +46,10 @@ function WeightChart({ data, targetWeight, selectedIndex, onSelect, height = 180
         </g>
       )}
       <polygon fill="url(#wgrad)" points={`12,${H} ${pts} ${W - 12},${H}`} />
-      <polyline fill="none" stroke="#18a878" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" points={pts} />
+      <polyline fill="none" stroke="var(--syj-primary)" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" points={pts} />
       {data.map((d, i) => (
         <g key={i} onClick={() => onSelect?.(i)} className="cursor-pointer">
-          <circle cx={px(i)} cy={py(d.v)} r={selectedIndex === i ? '6' : '4'} fill="white" stroke={selectedIndex === i ? '#f59e0b' : '#18a878'} strokeWidth="2.2" />
+          <circle cx={px(i)} cy={py(d.v)} r={selectedIndex === i ? '6' : '4'} fill="white" stroke={selectedIndex === i ? '#f59e0b' : 'var(--syj-primary)'} strokeWidth="2.2" />
           <text x={px(i)} y={py(d.v) - 9} textAnchor="middle" fontSize="8.5" fill="#6b7280">
             {d.v}
           </text>
@@ -63,7 +64,7 @@ function SummaryCard({ label, value, unit, hint, accent = 'text-emerald-600' }) 
     <div className="syj-card-solid p-4">
       <p className="text-xs font-semibold text-gray-400">{label}</p>
       <p className={`mt-1 text-2xl font-black tracking-tight ${accent}`}>
-        {value}<span className="ml-1 text-xs font-semibold text-gray-400">{unit}</span>
+        <span className="syj-num">{value}</span><span className="ml-1 text-xs font-semibold text-gray-400">{unit}</span>
       </p>
       <p className="mt-2 text-[11px] text-gray-400 leading-5">{hint}</p>
     </div>
@@ -132,7 +133,7 @@ export default function WeightPage() {
         <div>
           <p className="text-sm font-semibold text-gray-400">当前体重</p>
           <p className="text-4xl font-black text-emerald-600 mt-1 tracking-tight">
-            {latest?.weight ?? '--'} <span className="text-lg font-normal text-gray-400">kg</span>
+            <span className="syj-num">{latest?.weight ?? '--'}</span> <span className="text-lg font-normal text-gray-400">kg</span>
           </p>
           {diff !== null && (
             <p className={`text-sm mt-1.5 font-medium ${parseFloat(diff) > 0 ? 'text-orange-500' : parseFloat(diff) < 0 ? 'text-green-600' : 'text-gray-400'}`}>
@@ -144,7 +145,7 @@ export default function WeightPage() {
         {targetWeight && (
           <div className="w-full sm:w-auto text-left sm:text-right bg-white/75 rounded-3xl px-4 py-3 shadow-sm">
             <p className="text-xs text-gray-400">目标</p>
-            <p className="text-xl font-bold text-emerald-600">{targetWeight} kg</p>
+            <p className="text-xl font-bold text-emerald-600"><span className="syj-num">{targetWeight}</span> kg</p>
             {latest && <p className="text-xs text-gray-400 mt-0.5">距目标 {gapToTarget} kg</p>}
           </div>
         )}
@@ -174,19 +175,21 @@ export default function WeightPage() {
         </div>
         <WeightChart data={chartData} targetWeight={targetWeight} selectedIndex={selectedIndex ?? chartData.length - 1} onSelect={setSelectedIndex} />
         {selectedPoint && (
-          <div className="mt-3 rounded-3xl bg-emerald-50/75 px-4 py-3 text-sm text-gray-600 flex items-center justify-between gap-3">
-            <span>{selectedPoint.date}</span>
-            <span className="font-bold text-emerald-600">{selectedPoint.v} kg</span>
+          <div className="mt-3 rounded-3xl bg-emerald-50/75 px-4 py-3 space-y-3">
+            <div className="flex items-center justify-between gap-3 text-sm text-gray-600">
+              <span>{selectedPoint.date}</span>
+              <span className="font-bold text-emerald-600"><span className="syj-num">{selectedPoint.v}</span> kg</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {['经期', '熔夜', '聚餐', '水肿'].map((tag) => (
+                <button key={tag} onClick={() => handleTagToggle(tag)} className={`h-8 px-3 rounded-full text-xs font-semibold active:scale-95 transition-transform ${activeTags.includes(tag) ? 'bg-emerald-400 text-white shadow-sm' : 'bg-white/80 text-gray-500 border border-gray-100'}`}>
+                  {tag}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-gray-400">点入标签为当日体重波动补充说明，不影响趋势计算</p>
           </div>
         )}
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {['经期', '熬夜', '聚餐', '水肿'].map((tag) => (
-          <button key={tag} onClick={() => handleTagToggle(tag)} className={`h-10 rounded-2xl text-xs font-semibold shadow-sm active:scale-95 transition-transform ${activeTags.includes(tag) ? 'bg-emerald-400 text-white' : 'bg-white/80 text-gray-400'}`}>
-            {tag}
-          </button>
-        ))}
       </div>
 
       <Link
@@ -208,7 +211,7 @@ export default function WeightPage() {
             return (
               <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-3 border-t border-gray-50">
                 <div>
-                  <span className="text-sm font-semibold text-gray-800">{r.weight} kg</span>
+                  <span className="text-sm font-semibold text-gray-800"><span className="syj-num">{r.weight}</span> kg</span>
                   {r.note && <span className="text-xs text-gray-400 ml-2">{r.note}</span>}
                   {d !== null && (
                     <span className={`text-xs ml-2 font-medium ${parseFloat(d) > 0 ? 'text-orange-400' : parseFloat(d) < 0 ? 'text-green-500' : 'text-gray-300'}`}>
@@ -225,11 +228,7 @@ export default function WeightPage() {
           })}
         </div>
       ) : (
-        <div className="syj-card bg-gradient-to-br from-emerald-50/95 to-sky-50/90 text-center py-14 text-gray-400">
-          <div className="text-5xl mb-3">⚖️</div>
-          <p className="text-sm">暂无体重记录</p>
-          <Link href="/weight/add" className="inline-block mt-4 text-emerald-500 font-medium text-sm">去记录</Link>
-        </div>
+        <EmptyState icon="⚖️" title="暂无体重记录" desc="记录起点，稳步看见变化" actionLabel="去记录" action={() => { window.location.href = '/weight/add' }} />
       )}
 
       <ConfirmDialog open={Boolean(deleteId)} title="确认删除这条体重记录？" message="删除后趋势图会同步更新。" confirmText="删除" danger onConfirm={() => handleDelete(deleteId)} onClose={() => setDeleteId(null)} />

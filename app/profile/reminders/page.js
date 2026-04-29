@@ -33,7 +33,30 @@ export default function RemindersPage() {
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('syj_token') || ''}` },
             body: JSON.stringify(settings),
         }).catch(() => { })
-        toast.success('提醒设置已保存')
+        // 确保 Push 订阅已注册
+        try {
+            if ('serviceWorker' in navigator && 'PushManager' in window) {
+                const perm = await Notification.requestPermission()
+                if (perm === 'granted') {
+                    const reg = await navigator.serviceWorker.ready
+                    let sub = await reg.pushManager.getSubscription()
+                    if (!sub) {
+                        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+                        const padding = '='.repeat((4 - (vapidKey.length % 4)) % 4)
+                        const base64 = (vapidKey + padding).replace(/-/g, '+').replace(/_/g, '/')
+                        const rawData = atob(base64)
+                        const key = Uint8Array.from([...rawData].map(c => c.charCodeAt(0)))
+                        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key })
+                        await fetch('/api/push/subscribe', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('syj_token') || ''}` },
+                            body: JSON.stringify(sub.toJSON()),
+                        })
+                    }
+                }
+            }
+        } catch {}
+        toast.success('提醒设置已保存，推送已开启 🔔')
         router.replace('/profile/settings')
     }
 

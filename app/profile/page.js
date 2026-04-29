@@ -12,7 +12,7 @@ function StatCard({ label, value, unit, accent = 'text-emerald-600', href }) {
     const inner = (
         <div className="syj-card-solid p-3 active:scale-95 transition-transform">
             <p className={`text-xl font-black tracking-tight ${accent}`}>
-                {value}
+                <span className="syj-num">{value}</span>
                 <span className="text-xs text-gray-400 ml-1">{unit}</span>
             </p>
             <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
@@ -48,6 +48,23 @@ export default function ProfilePage() {
     const [syncStatus, setSyncStatus] = useState(() => getSyncStatus())
     const [manualSyncing, setManualSyncing] = useState(false)
     const [logoutOpen, setLogoutOpen] = useState(false)
+    const [isDark, setIsDark] = useState(false)
+
+    useEffect(() => {
+        try {
+            const t = localStorage.getItem('syj_theme')
+            const dark = t === 'dark' || (t == null && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
+            setIsDark(!!dark)
+        } catch { }
+    }, [])
+    const toggleTheme = () => {
+        const next = !isDark
+        setIsDark(next)
+        try {
+            localStorage.setItem('syj_theme', next ? 'dark' : 'light')
+            document.documentElement.classList.toggle('dark', next)
+        } catch { }
+    }
 
     useEffect(() => {
         const refreshSyncStatus = () => setSyncStatus(getSyncStatus())
@@ -135,6 +152,14 @@ export default function ProfilePage() {
                     <Link href="/profile/info" className="syj-pill h-9 px-3 bg-white/85 text-sm font-semibold text-emerald-600 shadow-sm">
                         编辑
                     </Link>
+                    <button
+                        type="button"
+                        onClick={toggleTheme}
+                        aria-label="切换主题"
+                        className="w-9 h-9 ml-2 rounded-2xl bg-white/85 dark:bg-gray-700 flex items-center justify-center text-lg shadow-sm active:scale-90 transition-transform"
+                    >
+                        {isDark ? '☀️' : '🌙'}
+                    </button>
                 </div>
                 <div className="mt-4 h-2 rounded-full bg-white/70 overflow-hidden">
                     <div className="h-full rounded-full bg-gradient-to-r from-emerald-300 to-teal-400" style={{ width: profile.targetWeight ? '66%' : '28%' }} />
@@ -181,22 +206,29 @@ export default function ProfilePage() {
                         <span className="text-lg">🏆</span>
                         <h3 className="text-sm font-semibold text-gray-700">成就勋章</h3>
                     </div>
-                    <span className="text-[11px] text-gray-400">Lv.{gamification.level.level} · {gamification.points} 积分 ›</span>
+                    <span className="text-[11px] text-gray-400">Lv.<span className="syj-num">{gamification.level.level}</span> · <span className="syj-num">{gamification.points}</span> 积分 ›</span>
                 </div>
                 {gamification.achievements.length ? (
-                    <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                        {gamification.achievements.slice(0, 8).map((a) => (
-                            <div
-                                key={a.achievement_key}
-                                className={`shrink-0 w-16 flex flex-col items-center text-center ${a.is_unlocked ? '' : 'opacity-40 grayscale'}`}
-                            >
-                                <div className="w-12 h-12 rounded-3xl bg-white shadow-sm flex items-center justify-center text-2xl mb-1">
-                                    {a.is_unlocked ? '🎖️' : '🔒'}
+                    <>
+                        <div className="grid grid-cols-3 gap-2">
+                            {gamification.achievements.slice(0, 6).map((a) => (
+                                <div
+                                    key={a.achievement_key}
+                                    className={`flex flex-col items-center text-center ${a.is_unlocked ? '' : 'opacity-40 grayscale'}`}
+                                >
+                                    <div className="w-12 h-12 rounded-3xl bg-white shadow-sm flex items-center justify-center text-2xl mb-1">
+                                        {a.is_unlocked ? '🎖️' : '🔒'}
+                                    </div>
+                                    <p className="text-[10px] text-gray-500 leading-tight truncate w-full">{a.achievement_name}</p>
                                 </div>
-                                <p className="text-[10px] text-gray-500 leading-tight truncate w-full">{a.achievement_name}</p>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                        {gamification.achievements.length > 6 && (
+                            <p className="mt-2 text-center text-xs text-emerald-600 font-semibold">
+                                查看全部 <span className="syj-num">{gamification.achievements.length}</span> 枚勋章 →
+                            </p>
+                        )}
+                    </>
                 ) : (
                     <p className="text-xs text-gray-400 text-center py-2">完成记录可解锁勋章，点这里查看全部挑战 ›</p>
                 )}

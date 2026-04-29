@@ -95,10 +95,10 @@ export default function BottomNav() {
             <Link
               key={href}
               href={href}
-              className={`relative flex-1 min-h-[56px] rounded-3xl flex flex-col items-center justify-center gap-0.5 text-[12px] font-medium transition-all duration-200 ${active ? 'text-emerald-700 bg-emerald-50' : 'text-gray-400 hover:text-gray-600'
+              className={`relative flex-1 min-h-[56px] rounded-3xl flex flex-col items-center justify-center gap-0.5 text-[12px] font-medium transition-all duration-150 ${active ? 'text-emerald-700 bg-emerald-50' : 'text-gray-400 hover:text-gray-600'
                 }`}
             >
-              <span className={`transition-transform duration-200 ${active ? 'scale-110' : ''}`}>
+              <span className={`transition-transform duration-150 ${active ? 'scale-110' : ''}`}>
                 {icon}
               </span>
               <span className={active ? 'font-semibold' : ''}>{label}</span>

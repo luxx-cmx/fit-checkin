@@ -52,7 +52,8 @@ function MiniLineChart({ data, color = '#16a34a', height = 70 }) {
   )
 }
 
-function CalorieRing({ consumed, target, unit = 'kcal', color = '#18a878', danger = true, size = 'w-20 h-20' }) {
+function CalorieRing({ consumed, target, unit = 'kcal', color = '#4ECDC4', danger = true, size = 'w-20 h-20' }) {
+  const isEmpty = !consumed || Number(consumed) === 0
   const rawPct = Number(consumed || 0) / (Number(target) || 1)
   const pct = Math.min(Math.max(rawPct, 0), 1)
   const r = 38,
@@ -75,12 +76,18 @@ function CalorieRing({ consumed, target, unit = 'kcal', color = '#18a878', dange
         transform="rotate(-90 50 50)"
         style={{ transition: 'stroke-dasharray 0.6s ease' }}
       />
-      <text x="50" y="46" textAnchor="middle" fontSize="13" fontWeight="bold" fill={strokeColor}>
-        {consumed}
-      </text>
-      <text x="50" y="60" textAnchor="middle" fontSize="9" fill="#9ca3af">
-        {unit}
-      </text>
+      {isEmpty ? (
+        <text x="50" y="54" textAnchor="middle" fontSize="10" fill="#9ca3af" fontWeight="600">点击记录</text>
+      ) : (
+        <>
+          <text x="50" y="46" textAnchor="middle" fontSize="13" fontWeight="bold" fill={strokeColor} className="syj-num">
+            {consumed}
+          </text>
+          <text x="50" y="60" textAnchor="middle" fontSize="9" fill="#9ca3af">
+            {unit}
+          </text>
+        </>
+      )}
     </svg>
   )
 }
@@ -324,13 +331,13 @@ export default function Home() {
     {
       key: 'calories',
       title: '今日热量',
-      value: d.calories,
-      unit: 'kcal',
-      caption: d.calories > d.target ? `超出 ${d.calories - d.target} kcal` : `还可搭配 ${d.target - d.calories} kcal`,
+      value: d.calories || '未记录',
+      unit: d.calories ? 'kcal' : '',
+      caption: !d.calories ? '今日还未记录饮食，点击 + 开始' : (d.calories > d.target ? `超出 ${d.calories - d.target} kcal` : `还可搭配 ${d.target - d.calories} kcal`),
       note: changeText(d.calories, d.yesterdayCalories, 'kcal'),
       tone: d.calories > d.target ? 'text-rose-500' : 'text-emerald-600',
       bg: 'from-emerald-50/95 to-white/85',
-      ring: { consumed: d.calories, target: d.target, unit: 'kcal', color: '#18a878' },
+      ring: { consumed: d.calories, target: d.target, unit: 'kcal', color: '#4ECDC4' },
       progress: Math.min(100, Math.round((d.calories / (d.target || 1)) * 100)),
       href: '/diet',
     },
@@ -462,7 +469,7 @@ export default function Home() {
                 <div className="min-w-0">
                   <p className="text-xs font-semibold text-gray-400">{card.title}</p>
                   <p className="mt-1 text-2xl font-black tracking-tight text-gray-800">
-                    {card.value} <span className="text-xs font-semibold text-gray-400">{card.unit}</span>
+                    <span className={card.unit ? 'syj-num' : ''}>{card.value}</span> <span className="text-xs font-semibold text-gray-400">{card.unit}</span>
                   </p>
                   <p className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${card.tone} bg-white/70`}>{card.caption}</p>
                 </div>
@@ -503,6 +510,10 @@ export default function Home() {
                 {adviceOpen ? '收起' : '展开'}
               </button>
             </div>
+            <div
+              className={`overflow-hidden ${adviceOpen ? 'max-h-[40vh] overflow-y-auto' : 'max-h-[2.8em]'}`}
+              style={{ transition: 'max-height var(--dur-reveal) var(--ease-std)' }}
+            >
             <p className={`text-xs text-gray-500 leading-5 mt-1 ${adviceOpen ? '' : 'line-clamp-1'}`}>{d.advice}</p>
             {/* AI 深度分析结果 */}
             {adviceOpen && aiAdvice.loading && !aiAdvice.text && (
@@ -530,6 +541,7 @@ export default function Home() {
                 <Link href="/analysis" className="h-8 px-3 rounded-full bg-white/75 text-gray-500 text-[11px] font-semibold flex items-center">数据分析</Link>
               </div>
             )}
+            </div>
           </div>
         </div>
       </div>
@@ -560,13 +572,13 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="hidden md:grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         {[
-          { href: '/analysis', title: '高级分析', desc: '点击后按需加载体重-热量关联' },
-          { href: '/reports', title: '报告分享', desc: '生成7天/30天报告卡片' },
-          { href: '/social', title: '社区互动', desc: '好友、动态、小组与激励' },
+          { href: '/analysis', title: '🔍 高级分析', desc: '体重-热量关联' },
+          { href: '/reports', title: '📊 报告分享', desc: '7天/30天报告' },
+          { href: '/social', title: '👥 社区互动', desc: '好友动态激励' },
         ].map((item) => (
-          <Link key={item.href} href={item.href} className="syj-card-solid rounded-[1.4rem] px-4 py-3 hover:bg-emerald-50/60 transition-colors">
+          <Link key={item.href} href={item.href} className="syj-card-solid rounded-[1.4rem] px-3 py-3 hover:bg-emerald-50/60 transition-colors">
             <p className="text-sm font-semibold text-gray-700">{item.title}</p>
             <p className="text-xs text-gray-400 mt-1">{item.desc}</p>
           </Link>

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/AppDialog'
 import { SkeletonCard } from '@/components/Skeleton'
+import { EmptyState } from '@/components/EmptyState'
 import { getHealthRecords, addHealthRecord, deleteHealthRecord, todayStr, getProfile, getTodayCalories, getLatestWeight, trackEvent } from '@/lib/store'
 
 const TYPES = [
@@ -221,7 +222,7 @@ export default function HealthPage() {
                         <div key={r.id} className="flex items-center justify-between px-4 py-3 border-t border-gray-50">
                             <div>
                                 <span className={`text-sm font-semibold ${cur?.color}`}>
-                                    {r.value} {cur?.unit}
+                                    <span className="syj-num">{r.value}</span> {cur?.unit}
                                 </span>
                                 {r.note && <span className="text-xs text-gray-400 ml-2">{r.note}</span>}
                             </div>
@@ -235,10 +236,7 @@ export default function HealthPage() {
                     ))}
                 </div>
             ) : (
-                <div className="syj-card bg-gradient-to-br from-emerald-50/95 to-sky-50/90 text-center py-12 text-gray-400">
-                    <div className="text-5xl mb-3">{cur?.emoji}</div>
-                    <p className="text-sm">暂无{cur?.label}记录</p>
-                </div>
+                <EmptyState icon={cur?.emoji || '💊'} title={`暂无${cur?.label}记录`} desc="点击右上角添加按钮立即记录" />
             )}
 
             <ConfirmDialog open={Boolean(deleteId)} title="确认删除这条健康记录？" message="删除后将无法恢复。" confirmText="删除" danger onConfirm={() => handleDelete(deleteId)} onClose={() => setDeleteId(null)} />

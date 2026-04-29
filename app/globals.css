@@ -12,11 +12,18 @@
   --syj-muted: #7b8a84;
   --syj-primary: #78d8b6;
   --syj-primary-strong: #18a878;
+  --syj-accent: #4ECDC4;
   --syj-blue: #8cccf7;
   --syj-amber: #f4bd63;
   --syj-lilac: #c8b6ff;
   --syj-danger: #ef7f7f;
   --syj-shadow: 0 18px 45px rgba(46, 84, 67, 0.08);
+  /* 动效时长分级 */
+  --dur-micro: 0.15s;
+  --dur-transition: 0.25s;
+  --dur-reveal: 0.35s;
+  --dur-toast: 0.5s;
+  --ease-std: ease-in-out;
 }
 
 html.dark {
@@ -27,8 +34,9 @@ html.dark {
   --syj-border: rgba(148, 163, 184, 0.22);
   --syj-text: #e5e7eb;
   --syj-muted: #9ca3af;
-  --syj-primary: #77d7ba;
+  --syj-primary: #7ABFAD;
   --syj-primary-strong: #5ee0b2;
+  --syj-accent: #4ECDC4;
   --syj-shadow: 0 18px 45px rgba(0, 0, 0, 0.28);
 }
 
@@ -43,7 +51,23 @@ body {
 }
 
 body {
-  font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+  font-family: 'PingFang SC', 'Noto Sans SC', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* 数字等宽字体（体重/热量/步数等数据场景） */
+.syj-num {
+  font-family: 'DIN Alternate', 'Roboto Mono', 'PingFang SC', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* 呼吸动效（加载中/调用AI等场景） */
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.syj-breathe {
+  animation: breathe 2s ease-in-out infinite;
 }
 
 @layer components {
@@ -80,12 +104,24 @@ body {
     align-items: center;
     justify-content: center;
     border-radius: 1rem;
-    transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+    transition: transform var(--dur-micro) var(--ease-std),
+                background-color var(--dur-micro) var(--ease-std),
+                color var(--dur-micro) var(--ease-std);
   }
 
   .syj-icon-button:active {
     transform: scale(0.95);
   }
+}
+
+/* 适配断点规范
+   小屏：max-width: 375px  → Tailwind: max-sm
+   中屏：376px - 414px     → Tailwind: sm ~ md
+   大屏：≥ 415px           → Tailwind: md+
+   最低适配：iPhone SE2 (375px) / Android 720p 5.0英寸
+*/
+@media (min-width: 415px) {
+  .syj-page { padding: 1.25rem; }
 }
 
 html[data-syj-font-size='small'] {
@@ -210,4 +246,13 @@ textarea:focus-visible {
   100% {
     background-position: -200% 0;
   }
+}
+
+/* 打印报告样式 */
+@media print {
+  body { background: white !important; }
+  .print\:hidden { display: none !important; }
+  nav, header, [data-bottomnav], .syj-bottom-nav { display: none !important; }
+  main { padding: 0 !important; padding-bottom: 0 !important; }
+  .syj-card, .syj-card-solid { box-shadow: none !important; border: 1px solid #e5e7eb !important; }
 }

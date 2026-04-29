@@ -5,6 +5,8 @@ import AuthGuard from '@/components/AuthGuard'
 import SkinProvider from '@/components/SkinProvider'
 import BrowserNotice from '@/components/BrowserNotice'
 import OfflineBanner from '@/components/OfflineBanner'
+import PushRegister from '@/components/PushRegister'
+import '@/components/PushSchedulerInit'
 import { Toaster } from 'sonner'
 
 export const metadata = {
@@ -28,6 +30,7 @@ export default function RootLayout({ children }) {
             <AuthGuard>
               <BrowserNotice />
               <OfflineBanner />
+              <PushRegister />
               <main className="min-h-screen w-full max-w-[1180px] mx-auto pb-[calc(5.75rem+env(safe-area-inset-bottom))] md:pt-16 md:pb-10 page-enter">{children}</main>
               <BottomNav />
             </AuthGuard>

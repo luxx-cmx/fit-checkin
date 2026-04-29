@@ -1,10 +1,19 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
 import { SkeletonCard } from '@/components/Skeleton'
 import { toast } from 'sonner'
 import { getDietRecords, getHealthRecords, getProfile, getWeightRecords, todayStr, trackEvent } from '@/lib/store'
+
+function getBmiLabel(bmi) {
+    if (!bmi) return ''
+    if (bmi < 18.5) return '偏小'
+    if (bmi < 24) return '正常'
+    if (bmi < 28) return '超重'
+    return '肖肥'
+}
 
 function lastDays(n = 7) {
     return Array.from({ length: n }, (_, i) => {
@@ -149,12 +158,17 @@ export default function AnalysisPage() {
         }
     }, [period])
 
+    const profile = getProfile()
+    const bmiValue = data.body.bmi
+    const bmiMissing = !bmiValue
+    const bmiDisplay = bmiMissing ? '请设置' : String(bmiValue)
+
     const cards = useMemo(() => [
         ['今日摄入', data.today.calories, 'kcal'],
         [data.today.calories > data.today.target ? '已超额' : '剩余热量', data.today.remaining, 'kcal'],
-        ['BMI', data.body.bmi || '--', ''],
+        ['BMI', bmiDisplay, bmiMissing ? '' : getBmiLabel(bmiValue)],
         ['推荐热量', data.body.recommendCalorie || data.today.target, 'kcal'],
-    ], [data])
+    ], [data, bmiDisplay, bmiMissing])
 
     return (
         <div className="syj-page md:p-6 space-y-4">
@@ -170,6 +184,13 @@ export default function AnalysisPage() {
                 {cards.map(([label, value, unit], index) => (
                     <AnalysisMetricCard key={label} label={label} value={value} unit={unit} tone={index === 1 && data.today.calories > data.today.target ? 'text-rose-500' : 'text-emerald-600'} />
                 ))}
+                {bmiMissing && (
+                    <div className="col-span-2">
+                        <Link href="/profile/info" className="block text-xs text-center text-emerald-600 bg-emerald-50 rounded-2xl py-2 px-3">
+                            📌 BMI 需要身高和体重数据——点这里补充个人信息
+                        </Link>
+                    </div>
+                )}
             </div>
 
             <div className="syj-card-solid p-4">

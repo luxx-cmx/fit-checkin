@@ -346,7 +346,7 @@ export default function AddDietPage() {
                                 <span className="text-[10px] text-emerald-500">无需二次确认</span>
                             </div>
                             <div className="grid grid-cols-1 min-[380px]:grid-cols-3 gap-2">
-                                {frequentFoods.map((food) => (
+                                {frequentFoods.slice(0, 8).map((food) => (
                                     <button
                                         key={food.name}
                                         onClick={() => handleInstantAdd(food)}

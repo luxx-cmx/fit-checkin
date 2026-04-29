@@ -20,31 +20,36 @@ function formatChartValue(value, compact) {
     return String(value)
 }
 
+const BAR_H = 140 // 柱子区域固定像素高度
+
 function BarChart({ rows, color, target, compact = false }) {
     const max = Math.max(target || 0, ...rows.map((r) => r.value), 1)
     const hasData = rows.some((r) => r.value > 0)
     return (
         <div>
-            <div className="flex items-end gap-1 h-44 rounded-[1.5rem] bg-white/55 px-2 pt-4 pb-2">
-                {rows.map((r) => (
-                    <div key={r.date} className="flex-1 h-full flex flex-col items-center gap-2">
-                        <div className="w-full flex-1 flex flex-col justify-end items-center gap-1">
-                            <span className={`text-[8px] leading-none whitespace-nowrap ${r.value > 0 ? 'text-gray-400' : 'invisible'}`}>
-                                {r.value > 0 ? formatChartValue(r.value, compact) : '0'}
-                            </span>
-                            <div className="w-full flex-1 flex items-end">
+            <div className="flex items-end gap-1 rounded-[1.5rem] bg-white/55 px-2 pb-2 pt-2">
+                {rows.map((r) => {
+                    const barPx = r.value > 0 ? Math.max(4, Math.round((r.value / max) * BAR_H)) : 0
+                    return (
+                        <div key={r.date} className="flex-1 flex flex-col items-center gap-1" style={{ height: BAR_H + 24 }}>
+                            <div className="w-full flex flex-col justify-end items-center" style={{ flex: 1 }}>
+                                {r.value > 0 && (
+                                    <span className="text-[8px] leading-none whitespace-nowrap text-gray-400 mb-0.5">
+                                        {formatChartValue(r.value, compact)}
+                                    </span>
+                                )}
                                 <div
                                     className="w-full rounded-t-[10px] transition-all duration-300"
                                     style={{
-                                        height: r.value > 0 ? `${Math.max(4, Math.round((r.value / max) * 100))}%` : '0%',
+                                        height: barPx,
                                         backgroundColor: r.value > 0 ? color : 'transparent',
                                     }}
                                 />
                             </div>
+                            <span className="text-[9px] text-gray-400">{r.date.slice(5)}</span>
                         </div>
-                        <span className="text-[9px] text-gray-400">{r.date.slice(5)}</span>
-                    </div>
-                ))}
+                    )
+                })}
             </div>
             {!hasData && <p className="mt-3 text-center text-xs text-gray-400">暂无记录，新增数据后会自动生成趋势</p>}
         </div>

@@ -19,3 +19,5 @@ id_rsa
 id_rsa.pub
 *.bak
 *.backup
+PROJECT_SECRETS.md
+AGENT_PLAN_4.1.md
